@@ -5,10 +5,10 @@ The Franklin Experience Decisioning plugin helps you quickly set up experimentat
 ## Features
 
 The Franklin Experience Decisioning plugin supports:
-- serving different content variations to different audiences, including custom audience definitions for your project that can be either resolved directly in-browser or against a trusted backend API.
-- serving different content variations based on marketing campaigns you are running, so that you can easily track email and/or social campaigns
-- running A/B test experiments on a set of variants to measure and improve the conversion on your site. This works particularly with our [rum conversion plugin](https://github.com/adobe/franklin-rum-conversion).
-- easy simulation of each experience and basic reporting leveraging in-page overlays
+- :busts_in_silhouette: serving different content variations to different audiences, including custom audience definitions for your project that can be either resolved directly in-browser or against a trusted backend API.
+- :money_with_wings: serving different content variations based on marketing campaigns you are running, so that you can easily track email and/or social campaigns
+- :chart_with_upwards_trend: running A/B test experiments on a set of variants to measure and improve the conversion on your site. This works particularly with our :chart: [RUM conversion tracking plugin](https://github.com/adobe/franklin-rum-conversion).
+- :rocket: easy simulation of each experience and basic reporting leveraging in-page overlays
 
 ## Installation
 
