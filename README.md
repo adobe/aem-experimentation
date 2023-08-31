@@ -1,6 +1,6 @@
 # Franklin Experience Decisioning
 
-The Franklin Experience Decisioning plugin helps you quickly set up experimentation and personalization on your Franklin project.
+The Franklin Experience Decisioning plugin helps you quickly set up experimentation and segmentation on your Franklin project.
 
 ## Features
 
