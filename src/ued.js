@@ -119,7 +119,7 @@ function setLastExperimentTreatment(experimentId, treatment) {
 function assignTreatmentByDevice(experimentId, allocationPercentages, treatments) {
   var cachedTreatmentId = getLastExperimentTreatment(experimentId);
   var treatmentIdResponse;
-  if (!cachedTreatmentId) {
+  if (!cachedTreatmentId || !treatments.includes(cachedTreatmentId)) {
       var assignedTreatmentId = assignTreatment(allocationPercentages, treatments);
       setLastExperimentTreatment(experimentId, assignedTreatmentId);
       treatmentIdResponse = assignedTreatmentId;
