@@ -1,6 +1,8 @@
 # Franklin Experience Decisioning
 
-The Franklin Experience Decisioning plugin helps you quickly set up experimentation and segmentation on your Franklin project.
+The Franklin Experience Decisioning plugin helps you quickly set up experimentation and segmentation on your Franklin project. 
+It is currently available to customers in collaboration with AEM Engineering via co-innovation VIP Projects. 
+To implement experimentation or personalization use-cases, please reach out to the AEM Engineering team in the Slack channel dedicated to your project.
 
 ## Features
 
