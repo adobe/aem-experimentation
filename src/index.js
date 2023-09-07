@@ -360,10 +360,10 @@ export async function getConfig(experiment, instantExperiment, pluginOptions) {
   );
 
   window.hlx = window.hlx || {};
-  window.hlx.experiment = experimentConfig;
   if (!experimentConfig.run) {
     return false;
   }
+  window.hlx.experiment = experimentConfig;
 
   // eslint-disable-next-line no-console
   console.debug('run', experimentConfig.run, experimentConfig.audiences);
