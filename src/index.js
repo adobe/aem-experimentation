@@ -124,6 +124,8 @@ function parseExperimentConfig(json) {
       const key = this.toCamelCase(line.Name);
       if (key === 'audience' || key === 'audiences') {
         config.audiences = line.Value ? line.Value.split(',').map((str) => str.trim()) : [];
+      } else if (key === 'experimentName') {
+        config.label = line.Value;
       } else {
         config[key] = line.Value;
       }
