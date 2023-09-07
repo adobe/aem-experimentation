@@ -422,7 +422,7 @@ async function decorateAudiencesPill(overlay, options) {
  */
 export default async function decoratePreviewMode(options) {
   try {
-    this.loadCSS('/tools/preview/preview.css');
+    this.loadCSS('/plugins/experience-decisioning/src/preview.css');
     const overlay = getOverlay(options);
     await decorateAudiencesPill.call(this, overlay, options);
     await decorateCampaignPill.call(this, overlay, options);
