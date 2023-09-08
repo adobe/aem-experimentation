@@ -40,9 +40,9 @@ To properly connect and configure the plugin for your project, you'll need to ed
 
     /**
      * Gets all the metadata elements that are in the given scope.
-    * @param {String} scope The scope/prefix for the metadata
-    * @returns an array of HTMLElement nodes that match the given scope
-    */
+     * @param {String} scope The scope/prefix for the metadata
+     * @returns an array of HTMLElement nodes that match the given scope
+     */
     export function getAllMetadata(scope) {
       return [...document.head.querySelectorAll(`meta[property^="${scope}:"],meta[name^="${scope}-"]`)]
         .reduce((res, meta) => {
@@ -75,6 +75,7 @@ To properly connect and configure the plugin for your project, you'll need to ed
       if (getMetadata('experiment')
         || Object.keys(getAllMetadata('campaign')).length
         || Object.keys(getAllMetadata('audience')).length) {
+        // eslint-disable-next-line import/no-relative-packages
         const { loadEager: runEager } = await import('../plugins/experience-decisioning/src/index.js');
         await runEager.call(pluginContext, { audiences: AUDIENCES });
       }
@@ -91,6 +92,7 @@ To properly connect and configure the plugin for your project, you'll need to ed
         || Object.keys(getAllMetadata('campaign')).length
         || Object.keys(getAllMetadata('audience')).length)
         && (window.location.hostname.endsWith('hlx.page') || window.location.hostname === ('localhost'))) {
+        // eslint-disable-next-line import/no-relative-packages
         const { loadLazy: runLazy } = await import('../plugins/experience-decisioning/src/index.js');
         await runLazy.call(pluginContext, { audiences: AUDIENCES });
       }
