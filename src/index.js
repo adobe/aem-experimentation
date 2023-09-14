@@ -77,7 +77,9 @@ export async function getResolvedAudiences(applicableAudiences, options) {
  * @param {boolean} isBlock
  */
 async function replaceInner(path, element) {
-  const plainPath = `${path}.plain.html`;
+  const plainPath = path.endsWith('/')
+    ? `${path}/index.plain.html`
+    : `${path}.plain.html`;
   try {
     const resp = await fetch(plainPath);
     if (!resp.ok) {
