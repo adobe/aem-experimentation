@@ -322,7 +322,7 @@ function getDecisionPolicy(config) {
         randomizationUnit: 'DEVICE',
         treatments: Object.entries(config.variants).map(([key, props]) => ({
           id: key,
-          allocationPercentage: props.percentageSplit,
+          allocationPercentage: Number(props.percentageSplit) * 100,
         })),
       },
     }],
