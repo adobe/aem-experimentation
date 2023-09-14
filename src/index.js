@@ -222,10 +222,10 @@ function inferEmptyPercentageSplits(variants) {
  * @returns {object} the experiment manifest
  */
 export function getConfigForInstantExperiment(experimentId, instantExperiment, pluginOptions) {
+  const audience = this.getMetadata(`${pluginOptions.experimentsMetaTag}-audience`);
   const config = {
     label: `Instant Experiment: ${experimentId}`,
-    audiences: this.getMetadata(`${pluginOptions.experimentsMetaTag}-audience`)
-      .split(',').map(this.toClassName),
+    audiences: audience ? audience.split(',').map(this.toClassName) : [],
     status: 'Active',
     id: experimentId,
     variants: {},
