@@ -234,13 +234,12 @@ export function getConfigForInstantExperiment(experimentId, instantExperiment, p
 
   const pages = instantExperiment.split(',').map((p) => new URL(p.trim()).pathname);
 
-
-  const splits =
+  const splitString = this.getMetadata(`${pluginOptions.experimentsMetaTag}-split`);
+  const splits = splitString
     // custom split
-    this.getMetadata(`${pluginOptions.experimentsMetaTag}-split`)?.split(',')
-      .map((i) => parseInt(i, 10) / 100)
+    ? splitString.split(',').map((i) => parseInt(i, 10) / 100)
     // even split fallback
-    || [...new Array(pages.length)].map(() => 1 / (pages.length + 1));
+    : [...new Array(pages.length)].map(() => 1 / (pages.length + 1));
 
   config.variantNames.push('control');
   config.variants.control = {
