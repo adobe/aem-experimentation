@@ -78,7 +78,7 @@ export async function getResolvedAudiences(applicableAudiences, options) {
  */
 async function replaceInner(path, element) {
   const plainPath = path.endsWith('/')
-    ? `${path}/index.plain.html`
+    ? `${path}index.plain.html`
     : `${path}.plain.html`;
   try {
     const resp = await fetch(plainPath);
