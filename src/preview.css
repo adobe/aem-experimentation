@@ -11,7 +11,7 @@
  */
 
  .hlx-preview-overlay {
-  z-index: 99;
+  z-index: 999;
   position: fixed;
   bottom: 32px;
   right: 32px;
@@ -96,6 +96,7 @@
   display: inline-block;
   border-radius: 20px;
   text-decoration: none;
+  word-break: normal;
 }
 
 .hlx-popup-header {
