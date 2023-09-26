@@ -1,12 +1,12 @@
-# Franklin Experience Decisioning
+# AEM Experience Decisioning
 
-The Franklin Experience Decisioning plugin helps you quickly set up experimentation and segmentation on your Franklin project. 
+The AEM Experience Decisioning plugin helps you quickly set up experimentation and segmentation on your AEM project. 
 It is currently available to customers in collaboration with AEM Engineering via co-innovation VIP Projects. 
 To implement experimentation or personalization use-cases, please reach out to the AEM Engineering team in the Slack channel dedicated to your project.
 
 ## Features
 
-The Franklin Experience Decisioning plugin supports:
+The AEM Experience Decisioning plugin supports:
 - :busts_in_silhouette: serving different content variations to different audiences, including custom audience definitions for your project that can be either resolved directly in-browser or against a trusted backend API.
 - :money_with_wings: serving different content variations based on marketing campaigns you are running, so that you can easily track email and/or social campaigns
 - :chart_with_upwards_trend: running A/B test experiments on a set of variants to measure and improve the conversion on your site. This works particularly with our :chart: [RUM conversion tracking plugin](https://github.com/adobe/franklin-rum-conversion).
@@ -14,21 +14,21 @@ The Franklin Experience Decisioning plugin supports:
 
 ## Installation
 
-Add the plugin to your Franklin project by running:
+Add the plugin to your AEM project by running:
 ```sh
-git subtree add --squash --prefix plugins/experience-decisioning git@github.com:adobe/franklin-experience-decisioning.git main
+git subtree add --squash --prefix plugins/experience-decisioning git@github.com:adobe/aem-experience-decisioning.git main
 ```
 
 If you later want to pull the latest changes and update your local copy of the plugin
 ```sh
-git subtree pull --squash --prefix plugins/experience-decisioning git@github.com:adobe/franklin-experience-decisioning.git main
+git subtree pull --squash --prefix plugins/experience-decisioning git@github.com:adobe/aem-experience-decisioning.git main
 ```
 
-If you prefer using `https` links you'd replace `git@github.com:adobe/franklin-experience-decisioning.git` in the above commands by `https://github.com/adobe/franklin-experience-decisioning.git`.
+If you prefer using `https` links you'd replace `git@github.com:adobe/aem-experience-decisioning.git` in the above commands by `https://github.com/adobe/aem-experience-decisioning.git`.
 
 ## Project instrumentation
 
-To properly connect and configure the plugin for your project, you'll need to edit your `scripts.js` in your Franklin project and add the following:
+To properly connect and configure the plugin for your project, you'll need to edit your `scripts.js` in your AEM project and add the following:
 
 1. at the start of the file:
     ```js
@@ -108,7 +108,7 @@ You have already seen the `audiences` option in the examples above, but here is 
 ```js
 runEager.call(pluginContext, {
   /* Generic properties */
-  // RUM sampling rate on regular franklin pages is 1 out of 100 page views
+  // RUM sampling rate on regular AEM pages is 1 out of 100 page views
   // but we increase this by default for audiences, campaigns and experiments
   // to 1 out of 10 page views so we can collect metrics faster of the relative
   // short durations of those campaigns/experiments
