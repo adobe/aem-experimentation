@@ -69,6 +69,7 @@ function createPopupButton(label, header, items) {
   return button;
 }
 
+// eslint-disable-next-line no-unused-vars
 function createToggleButton(label) {
   const button = document.createElement('div');
   button.className = 'hlx-badge';

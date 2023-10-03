@@ -24,7 +24,7 @@
 }
 
 .hlx-badge {
-  border-radius: 32px; 
+  border-radius: 32px;
   background-color: #888;
   color: #eee;
   padding: 16px 32px;
@@ -35,6 +35,9 @@
   font-size: inherit;
   overflow: initial;
   margin: 0;
+  line-height: 1.5;
+  text-transform: none;
+  font-family: system-ui, sans-serif;
 }
 
 .hlx-badge:focus,
@@ -87,6 +90,7 @@
   font-size: 12px;
   text-align: initial;
   white-space: initial;
+  line-height: 1.5;
 }
 
 .hlx-popup a:any-link {
@@ -102,7 +106,7 @@
 .hlx-popup-header {
   display: grid;
   grid-template:
-    "label actions" 
+    "label actions"
     "description actions"
     / 1fr min-content;
   background-color: #222;
@@ -124,7 +128,9 @@
   flex-direction: column;
 }
 
-.hlx-popup h4, .hlx-popup h5 {
+.hlx-popup h4,
+.hlx-popup h5 {
+  font-family: system-ui, sans-serif;
   margin: 0;
 }
 
@@ -136,13 +142,16 @@
   font-size: 14px;
 }
 
-
-.hlx-popup p {
+.hlx-popup p,
+.hlx-popup code {
   margin: 0;
+  padding: 0;
+  font-size: inherit;
+  line-height: 1.5;
 }
 
 .hlx-popup::before {
-  content: '';
+  content: "";
   width: 0;
   height: 0;
   position: absolute;
@@ -200,7 +209,8 @@
   flex: 0 0 auto;
 }
 
-@media screen and (min-width: 900px) {
+/* stylelint-disable-next-line media-feature-range-notation */
+@media (min-width: 900px) {
   .hlx-preview-overlay {
     flex-flow: row-reverse wrap-reverse;
     justify-content: flex-start;
