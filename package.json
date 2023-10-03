@@ -1,5 +1,5 @@
 {
-  "name": "@adobe/franklin-experience-decisioning",
+  "name": "@adobe/aem-experience-decisioning",
   "version": "1.0.0",
   "main": "src/index.js",
   "scripts": {
@@ -9,12 +9,12 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+ssh://git@github.com/adobe/franklin-experience-decisioning.git"
+    "url": "git+ssh://git@github.com/adobe/aem-experience-decisioning.git"
   },
   "author": "Adobe Inc.",
   "license": "Apache-2.0",
   "keywords": [
-    "franklin",
+    "aem",
     "experimentation",
     "experience",
     "decisioning",
@@ -23,9 +23,9 @@
     "audiences"
   ],
   "bugs": {
-    "url": "https://github.com/adobe/franklin-experience-decisioning/issues"
+    "url": "https://github.com/adobe/aem-experience-decisioning/issues"
   },
-  "homepage": "https://github.com/adobe/franklin-experience-decisioning#readme",
+  "homepage": "https://github.com/adobe/aem-experience-decisioning#readme",
   "devDependencies": {
     "eslint": "8.48.0",
     "eslint-config-airbnb-base": "15.0.0",

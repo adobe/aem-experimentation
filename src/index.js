@@ -441,7 +441,7 @@ export async function runExperiment(customOptions = {}) {
 
 export async function runCampaign(customOptions) {
   if (isBot()) {
-    return null;
+    return false;
   }
 
   const options = { ...DEFAULT_OPTIONS, ...customOptions };
@@ -451,7 +451,7 @@ export async function runCampaign(customOptions) {
     : null)
     || (usp.has('utm_campaign') ? this.toClassName(usp.get('utm_campaign')) : null);
   if (!campaign) {
-    return null;
+    return false;
   }
 
   const audiences = this.getMetadata(`${options.audiencesMetaTagPrefix}-audience`)
@@ -463,12 +463,12 @@ export async function runCampaign(customOptions) {
 
   const allowedCampaigns = this.getAllMetadata(options.campaignsMetaTagPrefix);
   if (!Object.keys(allowedCampaigns).includes(campaign)) {
-    return null;
+    return false;
   }
 
   const urlString = allowedCampaigns[campaign];
   if (!urlString) {
-    return null;
+    return false;
   }
 
   try {
@@ -487,19 +487,19 @@ export async function runCampaign(customOptions) {
   } catch (err) {
     // eslint-disable-next-line no-console
     console.error(err);
-    return null;
+    return false;
   }
 }
 
 export async function serveAudience(customOptions) {
   if (isBot()) {
-    return null;
+    return false;
   }
 
   const pluginOptions = { ...DEFAULT_OPTIONS, ...customOptions };
   const configuredAudiences = this.getAllMetadata(pluginOptions.audiencesMetaTagPrefix);
   if (!Object.keys(configuredAudiences).length) {
-    return null;
+    return false;
   }
 
   const audiences = await getResolvedAudiences(
@@ -507,7 +507,7 @@ export async function serveAudience(customOptions) {
     pluginOptions,
   );
   if (!audiences || !audiences.length) {
-    return null;
+    return false;
   }
 
   const usp = new URLSearchParams(window.location.search);
@@ -517,7 +517,7 @@ export async function serveAudience(customOptions) {
 
   const urlString = configuredAudiences[forcedAudience || audiences[0]];
   if (!urlString) {
-    return null;
+    return false;
   }
 
   try {
@@ -536,7 +536,7 @@ export async function serveAudience(customOptions) {
   } catch (err) {
     // eslint-disable-next-line no-console
     console.error(err);
-    return null;
+    return false;
   }
 }
 
