@@ -135,6 +135,6 @@ runEager.call(pluginContext, {
 ```
 
 For detailed implementation instructions on the different features, please read the dedicated pages we have on those topics:
-- [Audiences](../../wiki/Audiences)
-- [Campaigns](../../wiki/Campaigns)
-- [Experiments](../../wiki/Experiments)
+- [Audiences](https://github.com/adobe/aem-experience-decisioning/wiki/Audiences)
+- [Campaigns](https://github.com/adobe/aem-experience-decisioning/wiki/Campaigns)
+- [Experiments](https://github.com/adobe/aem-experience-decisioning/wiki/Experiments)
