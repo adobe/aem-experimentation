@@ -107,6 +107,9 @@ You have already seen the `audiences` option in the examples above, but here is 
 
 ```js
 runEager.call(pluginContext, {
+  // Overrides the base path if the plugin was installed in a sub-directory
+  basePath: '',
+
   /* Generic properties */
   // RUM sampling rate on regular AEM pages is 1 out of 100 page views
   // but we increase this by default for audiences, campaigns and experiments
