@@ -550,7 +550,8 @@ window.hlx.patchBlockConfig.push((config) => {
 
   // The current experiment does not modify the block
   if (experiment.selectedVariant === experiment.variantNames[0]
-    || !experiment.blocks || !experiment.blocks.includes(config.blockName)) {
+    || !experiment.variants[experiment.variantNames[0]].blocks
+    || !experiment.variants[experiment.variantNames[0]].blocks.includes(config.blockName)) {
     return config;
   }
 
@@ -586,7 +587,7 @@ window.hlx.patchBlockConfig.push((config) => {
       path = `/blocks/${config.blockName}`;
     }
   } else { // Experimenting from a different branch on the same branch
-    path = variant.blocks[index];
+    path = `/blocks/${variant.blocks[index]}`;
   }
   if (!origin && !path) {
     return config;
