@@ -9,7 +9,6 @@
  * OF ANY KIND, either express or implied. See the License for the specific language
  * governing permissions and limitations under the License.
  */
-const MIN_SAMPLING_RATE = 100; // At a minimum we sample 1 in 100 requests
 const MAX_SAMPLING_RATE = 10; // At a maximum we sample 1 in 10 requests
 
 export const DEFAULT_OPTIONS = {
@@ -617,9 +616,9 @@ function adjustedRumSamplingRate(checkpoint, customOptions) {
       // adjust sampling rate based on project config …
       window.hlx.rum.weight = Math.min(
         window.hlx.rum.weight,
-        // … but limit it to the 10~100 range to avoid losing anonymization
+        // … but limit it to the 10% sampling at max to avoid losing anonymization
         // and reduce burden on the backend
-        Math.min(Math.max(pluginOptions.rumSamplingRate, MAX_SAMPLING_RATE), MIN_SAMPLING_RATE),
+        Math.max(pluginOptions.rumSamplingRate, MAX_SAMPLING_RATE),
       );
       window.hlx.rum.isSelected = (window.hlx.rum.random * window.hlx.rum.weight < 1);
       if (window.hlx.rum.isSelected) {
