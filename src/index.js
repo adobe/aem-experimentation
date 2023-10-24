@@ -616,9 +616,15 @@ function adjustedRumSamplingRate(checkpoint, customOptions) {
       // adjust sampling rate based on project config …
       window.hlx.rum.weight = Math.min(
         window.hlx.rum.weight,
+<<<<<<< HEAD
         // … but limit it to the 10% sampling at max to avoid losing anonymization
         // and reduce burden on the backend
         Math.max(pluginOptions.rumSamplingRate, MAX_SAMPLING_RATE),
+=======
+        // … but limit it to the 10~100 range to avoid losing anonymization
+        // and reduce burden on the backend
+        Math.min(Math.max(pluginOptions.rumSamplingRate, MAX_SAMPLING_RATE), MIN_SAMPLING_RATE),
+>>>>>>> d03ceca (feat: limit the sampling rate)
       );
       window.hlx.rum.isSelected = (window.hlx.rum.random * window.hlx.rum.weight < 1);
       if (window.hlx.rum.isSelected) {
