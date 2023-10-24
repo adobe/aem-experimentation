@@ -454,8 +454,12 @@ export async function runCampaign(customOptions) {
     return false;
   }
 
-  const audiences = this.getMetadata(`${options.audiencesMetaTagPrefix}-audience`)
-    .split(',').map(this.toClassName);
+  let audiences = this.getMetadata(`${options.campaignsMetaTagPrefix}-audience`);
+  if (!audiences) {
+    return false;
+  }
+
+  audiences = audiences.split(',').map(this.toClassName);
   const resolvedAudiences = await getResolvedAudiences(audiences, options);
   if (!!resolvedAudiences && !resolvedAudiences.length) {
     return false;
