@@ -86,7 +86,7 @@ async function replaceInner(path, element) {
     const resp = await fetch(plainPath);
     if (!resp.ok) {
       // eslint-disable-next-line no-console
-      console.log('error loading experiment content:', resp);
+      console.log('error loading content:', resp);
       return false;
     }
     const html = await resp.text();
@@ -95,7 +95,7 @@ async function replaceInner(path, element) {
     return true;
   } catch (e) {
     // eslint-disable-next-line no-console
-    console.log(`error loading experiment content: ${plainPath}`, e);
+    console.log(`error loading content: ${plainPath}`, e);
   }
   return false;
 }
@@ -351,7 +351,8 @@ export async function getConfig(experiment, instantExperiment, pluginOptions) {
     ? this.toClassName(usp.get(pluginOptions.audiencesQueryParameter))
     : null;
 
-  experimentConfig.resolvedAudiences = await getResolvedAudiences(
+  experimentConfig.resolvedAudiences = await getResolvedAudiences.call(
+    this,
     experimentConfig.audiences,
     pluginOptions,
   );
@@ -457,14 +458,12 @@ export async function runCampaign(customOptions) {
   }
 
   let audiences = this.getMetadata(`${options.campaignsMetaTagPrefix}-audience`);
-  if (!audiences) {
-    return false;
-  }
-
-  audiences = audiences.split(',').map(this.toClassName);
-  const resolvedAudiences = await getResolvedAudiences(audiences, options);
-  if (!!resolvedAudiences && !resolvedAudiences.length) {
-    return false;
+  if (audiences) {
+    audiences = audiences.split(',').map(this.toClassName);
+    const resolvedAudiences = await getResolvedAudiences.call(this, audiences, options);
+    if (!!resolvedAudiences && !resolvedAudiences.length) {
+      return false;
+    }
   }
 
   const allowedCampaigns = this.getAllMetadata(options.campaignsMetaTagPrefix);
@@ -508,7 +507,8 @@ export async function serveAudience(customOptions) {
     return false;
   }
 
-  const audiences = await getResolvedAudiences(
+  const audiences = await getResolvedAudiences.call(
+    this,
     Object.keys(configuredAudiences),
     pluginOptions,
   );
@@ -616,15 +616,9 @@ function adjustedRumSamplingRate(checkpoint, customOptions) {
       // adjust sampling rate based on project config …
       window.hlx.rum.weight = Math.min(
         window.hlx.rum.weight,
-<<<<<<< HEAD
         // … but limit it to the 10% sampling at max to avoid losing anonymization
         // and reduce burden on the backend
         Math.max(pluginOptions.rumSamplingRate, MAX_SAMPLING_RATE),
-=======
-        // … but limit it to the 10~100 range to avoid losing anonymization
-        // and reduce burden on the backend
-        Math.min(Math.max(pluginOptions.rumSamplingRate, MAX_SAMPLING_RATE), MIN_SAMPLING_RATE),
->>>>>>> d03ceca (feat: limit the sampling rate)
       );
       window.hlx.rum.isSelected = (window.hlx.rum.random * window.hlx.rum.weight < 1);
       if (window.hlx.rum.isSelected) {
