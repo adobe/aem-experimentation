@@ -394,24 +394,24 @@ async function decorateAudiencesPill(overlay, options) {
     return;
   }
 
-  const usp = new URLSearchParams(window.location.search);
-  const forcedAudience = usp.has(options.audiencesQueryParameter)
-    ? this.toClassName(usp.get(options.audiencesQueryParameter))
-    : null;
+  const resolvedAudiences = await this.getResolvedAudiences(
+    Object.keys(audiences),
+    options,
+  );
   const pill = createPopupButton(
     'Audiences',
     {
       label: 'Audiences for this page:',
     },
     [
-      createAudience('default', !forcedAudience || forcedAudience === 'default', options),
+      createAudience('default', !resolvedAudiences.length || resolvedAudiences[0] === 'default', options),
       ...Object.keys(audiences)
         .filter((a) => a !== 'audience')
-        .map((a) => createAudience(a, forcedAudience === a, options)),
+        .map((a) => createAudience(a, resolvedAudiences && resolvedAudiences[0] === a, options)),
     ],
   );
 
-  if (forcedAudience) {
+  if (resolvedAudiences.length) {
     pill.classList.add('is-active');
   }
   overlay.append(pill);
