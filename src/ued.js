@@ -175,9 +175,9 @@ function traverseDecisionTree(decisionNodesMap, context, currentNodeId) {
       return [treatment];
   }
 }
-function evaluateDecisionPolicy(decisionPolicy, context, options) {
-  if (options.storage && options.storage instanceof Storage) {
-    storage = options.storage;
+function evaluateDecisionPolicy(decisionPolicy, context) {
+  if (context.storage && context.storage instanceof Storage) {
+    storage = context.storage;
   }
   var decisionNodesMap = {};
   decisionPolicy.decisionNodes.forEach(function (item) {
