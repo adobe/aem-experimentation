@@ -86,7 +86,7 @@ async function replaceInner(path, element) {
     const resp = await fetch(plainPath);
     if (!resp.ok) {
       // eslint-disable-next-line no-console
-      console.log('error loading experiment content:', resp);
+      console.log('error loading content:', resp);
       return false;
     }
     const html = await resp.text();
@@ -95,7 +95,7 @@ async function replaceInner(path, element) {
     return true;
   } catch (e) {
     // eslint-disable-next-line no-console
-    console.log(`error loading experiment content: ${plainPath}`, e);
+    console.log(`error loading content: ${plainPath}`, e);
   }
   return false;
 }
@@ -463,14 +463,12 @@ export async function runCampaign(document, options, context) {
   }
 
   let audiences = context.getMetadata(`${pluginOptions.campaignsMetaTagPrefix}-audience`);
-  if (!audiences) {
-    return false;
-  }
-
-  audiences = audiences.split(',').map(context.toClassName);
-  const resolvedAudiences = await getResolvedAudiences(audiences, pluginOptions, context);
-  if (!!resolvedAudiences && !resolvedAudiences.length) {
-    return false;
+  if (audiences) {
+    audiences = audiences.split(',').map(context.toClassName);
+    const resolvedAudiences = await getResolvedAudiences(audiences, pluginOptions, context);
+    if (!!resolvedAudiences && !resolvedAudiences.length) {
+      return false;
+    }
   }
 
   const allowedCampaigns = context.getAllMetadata(pluginOptions.campaignsMetaTagPrefix);

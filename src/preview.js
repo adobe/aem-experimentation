@@ -276,11 +276,11 @@ function populatePerformanceMetrics(div, config, {
 async function decorateExperimentPill(overlay, options, context) {
   const config = window?.hlx?.experiment;
   const experiment = context.toClassName(context.getMetadata(options.experimentsMetaTag));
-  // eslint-disable-next-line no-console
-  console.log('preview experiment', experiment);
   if (!experiment || !config) {
     return;
   }
+  // eslint-disable-next-line no-console
+  console.log('preview experiment', experiment);
 
   const pill = createPopupButton(
     `Experiment: ${config.id}`,
@@ -339,7 +339,7 @@ async function decorateCampaignPill(overlay, options, context) {
   const forcedAudience = usp.has(options.audiencesQueryParameter)
     ? context.toClassName(usp.get(options.audiencesQueryParameter))
     : null;
-  const audiences = campaigns.audience.split(',').map(context.toClassName);
+  const audiences = campaigns.audience?.split(',').map(context.toClassName) || [];
   const resolvedAudiences = await context.getResolvedAudiences(audiences, options);
   const isActive = forcedAudience
     ? audiences.includes(forcedAudience)
