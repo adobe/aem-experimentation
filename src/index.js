@@ -356,7 +356,8 @@ export async function getConfig(experiment, instantExperiment, pluginOptions, co
     ? context.toClassName(usp.get(pluginOptions.audiencesQueryParameter))
     : null;
 
-  experimentConfig.resolvedAudiences = await getResolvedAudiences(
+  experimentConfig.resolvedAudiences = await getResolvedAudiences.call(
+    this,
     experimentConfig.audiences,
     pluginOptions,
     context,
@@ -512,7 +513,8 @@ export async function serveAudience(document, options, context) {
     return false;
   }
 
-  const audiences = await getResolvedAudiences(
+  const audiences = await getResolvedAudiences.call(
+    this,
     Object.keys(configuredAudiences),
     pluginOptions,
     context,
