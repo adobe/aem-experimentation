@@ -26,15 +26,14 @@ git subtree pull --squash --prefix plugins/experience-decisioning git@github.com
 
 If you prefer using `https` links you'd replace `git@github.com:adobe/aem-experience-decisioning.git` in the above commands by `https://github.com/adobe/aem-experience-decisioning.git`.
 
-## Prerequisites
-
-The AEM Experience Decisioning plugin requires 
 ## Project instrumentation
 
 ### On top of the plugin system
 
 The easiest way to add the plugin is if your project is set up with the plugin system extension in the boilerplate.
 You'll know you have it if `window.hlx.plugins` is defined on your page.
+
+If you don't have it, you can follow the proposal in https://github.com/adobe/aem-lib/pull/23 and apply the changes to your `aem.js`/`lib-franklin.js`.
 
 Once you have confirmed this, you'll need to edit your `scripts.js` in your AEM project and add the following at the start of the file:
 ```js
