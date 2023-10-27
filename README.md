@@ -26,7 +26,34 @@ git subtree pull --squash --prefix plugins/experience-decisioning git@github.com
 
 If you prefer using `https` links you'd replace `git@github.com:adobe/aem-experience-decisioning.git` in the above commands by `https://github.com/adobe/aem-experience-decisioning.git`.
 
+## Prerequisites
+
+The AEM Experience Decisioning plugin requires 
 ## Project instrumentation
+
+### On top of the plugin system
+
+The easiest way to add the plugin is if your project is set up with the plugin system extension in the boilerplate.
+You'll know you have it if `window.hlx.plugins` is defined on your page.
+
+Once you have confirmed this, you'll need to edit your `scripts.js` in your AEM project and add the following at the start of the file:
+```js
+const AUDIENCES = {
+  mobile: () => window.innerWidth < 600,
+  desktop: () => window.innerWidth >= 600,
+  // define your custom audiences here as needed
+};
+
+window.hlx.plugins.add('experience-decisioning', {
+  condition: () => getMetadata('experiment')
+    || Object.keys(getAllMetadata('campaign')).length
+    || Object.keys(getAllMetadata('audience')).length,
+  options: { audiences: AUDIENCES },
+  url: '/plugins/experience-decisioning/src/index.js',
+});
+```
+
+### Without the plugin system
 
 To properly connect and configure the plugin for your project, you'll need to edit your `scripts.js` in your AEM project and add the following:
 
@@ -77,7 +104,7 @@ To properly connect and configure the plugin for your project, you'll need to ed
         || Object.keys(getAllMetadata('audience')).length) {
         // eslint-disable-next-line import/no-relative-packages
         const { loadEager: runEager } = await import('../plugins/experience-decisioning/src/index.js');
-        await runEager.call(pluginContext, { audiences: AUDIENCES });
+        await runEager(document, { audiences: AUDIENCES }, pluginContext);
       }
       …
     }
@@ -90,11 +117,10 @@ To properly connect and configure the plugin for your project, you'll need to ed
       // Add below snippet at the end of the lazy phase
       if ((getMetadata('experiment')
         || Object.keys(getAllMetadata('campaign')).length
-        || Object.keys(getAllMetadata('audience')).length)
-        && (window.location.hostname.endsWith('hlx.page') || window.location.hostname === ('localhost'))) {
+        || Object.keys(getAllMetadata('audience')).length)) {
         // eslint-disable-next-line import/no-relative-packages
         const { loadLazy: runLazy } = await import('../plugins/experience-decisioning/src/index.js');
-        await runLazy.call(pluginContext, { audiences: AUDIENCES });
+        await runLazy(document, { audiences: AUDIENCES }, pluginContext);
       }
     }
     ```
@@ -111,7 +137,7 @@ runEager.call(pluginContext, {
   basePath: '',
   // Lets you configure if we are in a prod environment or not
   // (prod environments do not get the pill overlay)
-  isProdHost: () => window.location.hostname.endsWith('hlx.page')
+  isProd: () => window.location.hostname.endsWith('hlx.page')
     || window.location.hostname === ('localhost')
 
   /* Generic properties */

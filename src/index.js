@@ -654,7 +654,7 @@ export async function loadLazy(document, options, context) {
   };
   if (window.location.hostname.endsWith('hlx.page')
     || window.location.hostname === ('localhost')
-    || (options.isProdHost && !options.isProdHost())) {
+    || (typeof options.isProd === 'function' && !options.isProd())) {
     // eslint-disable-next-line import/no-cycle
     const preview = await import('./preview.js');
     preview.default(document, pluginOptions, { ...context, getResolvedAudiences });
