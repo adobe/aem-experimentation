@@ -28,6 +28,32 @@ If you prefer using `https` links you'd replace `git@github.com:adobe/aem-experi
 
 ## Project instrumentation
 
+### On top of the plugin system
+
+The easiest way to add the plugin is if your project is set up with the plugin system extension in the boilerplate.
+You'll know you have it if `window.hlx.plugins` is defined on your page.
+
+If you don't have it, you can follow the proposal in https://github.com/adobe/aem-lib/pull/23 and apply the changes to your `aem.js`/`lib-franklin.js`.
+
+Once you have confirmed this, you'll need to edit your `scripts.js` in your AEM project and add the following at the start of the file:
+```js
+const AUDIENCES = {
+  mobile: () => window.innerWidth < 600,
+  desktop: () => window.innerWidth >= 600,
+  // define your custom audiences here as needed
+};
+
+window.hlx.plugins.add('experience-decisioning', {
+  condition: () => getMetadata('experiment')
+    || Object.keys(getAllMetadata('campaign')).length
+    || Object.keys(getAllMetadata('audience')).length,
+  options: { audiences: AUDIENCES },
+  url: '/plugins/experience-decisioning/src/index.js',
+});
+```
+
+### Without the plugin system
+
 To properly connect and configure the plugin for your project, you'll need to edit your `scripts.js` in your AEM project and add the following:
 
 1. at the start of the file:
@@ -77,7 +103,7 @@ To properly connect and configure the plugin for your project, you'll need to ed
         || Object.keys(getAllMetadata('audience')).length) {
         // eslint-disable-next-line import/no-relative-packages
         const { loadEager: runEager } = await import('../plugins/experience-decisioning/src/index.js');
-        await runEager.call(pluginContext, { audiences: AUDIENCES });
+        await runEager(document, { audiences: AUDIENCES }, pluginContext);
       }
       …
     }
@@ -90,11 +116,10 @@ To properly connect and configure the plugin for your project, you'll need to ed
       // Add below snippet at the end of the lazy phase
       if ((getMetadata('experiment')
         || Object.keys(getAllMetadata('campaign')).length
-        || Object.keys(getAllMetadata('audience')).length)
-        && (window.location.hostname.endsWith('hlx.page') || window.location.hostname === ('localhost'))) {
+        || Object.keys(getAllMetadata('audience')).length)) {
         // eslint-disable-next-line import/no-relative-packages
         const { loadLazy: runLazy } = await import('../plugins/experience-decisioning/src/index.js');
-        await runLazy.call(pluginContext, { audiences: AUDIENCES });
+        await runLazy(document, { audiences: AUDIENCES }, pluginContext);
       }
     }
     ```
@@ -109,6 +134,10 @@ You have already seen the `audiences` option in the examples above, but here is 
 runEager.call(pluginContext, {
   // Overrides the base path if the plugin was installed in a sub-directory
   basePath: '',
+  // Lets you configure if we are in a prod environment or not
+  // (prod environments do not get the pill overlay)
+  isProd: () => window.location.hostname.endsWith('hlx.page')
+    || window.location.hostname === ('localhost')
 
   /* Generic properties */
   // RUM sampling rate on regular AEM pages is 1 out of 100 page views
