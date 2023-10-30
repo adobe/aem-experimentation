@@ -424,7 +424,7 @@ async function decorateAudiencesPill(overlay, options, context) {
  */
 export default async function decoratePreviewMode(document, options, context) {
   try {
-    context.loadCSS(`${options.basePath || window.hlx.codeBasePath}/plugins/experience-decisioning/src/preview.css`);
+    context.loadCSS(`${options.basePath || window.hlx.codeBasePath}/plugins/experimentation/src/preview.css`);
     const overlay = getOverlay(options);
     await decorateAudiencesPill(overlay, options, context);
     await decorateCampaignPill(overlay, options, context);
