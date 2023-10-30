@@ -1,12 +1,12 @@
-# AEM Experience Decisioning
+# AEM Edge Delivery Services Experimenation
 
-The AEM Experience Decisioning plugin helps you quickly set up experimentation and segmentation on your AEM project. 
+The AEM Experimentation plugin helps you quickly set up experimentation and segmentation on your AEM project. 
 It is currently available to customers in collaboration with AEM Engineering via co-innovation VIP Projects. 
 To implement experimentation or personalization use-cases, please reach out to the AEM Engineering team in the Slack channel dedicated to your project.
 
 ## Features
 
-The AEM Experience Decisioning plugin supports:
+The AEM Experimentation plugin supports:
 - :busts_in_silhouette: serving different content variations to different audiences, including custom audience definitions for your project that can be either resolved directly in-browser or against a trusted backend API.
 - :money_with_wings: serving different content variations based on marketing campaigns you are running, so that you can easily track email and/or social campaigns
 - :chart_with_upwards_trend: running A/B test experiments on a set of variants to measure and improve the conversion on your site. This works particularly with our :chart: [RUM conversion tracking plugin](https://github.com/adobe/franklin-rum-conversion).
@@ -16,15 +16,15 @@ The AEM Experience Decisioning plugin supports:
 
 Add the plugin to your AEM project by running:
 ```sh
-git subtree add --squash --prefix plugins/experience-decisioning git@github.com:adobe/aem-experience-decisioning.git main
+git subtree add --squash --prefix plugins/experimentation git@github.com:adobe/aem-experimentation.git main
 ```
 
 If you later want to pull the latest changes and update your local copy of the plugin
 ```sh
-git subtree pull --squash --prefix plugins/experience-decisioning git@github.com:adobe/aem-experience-decisioning.git main
+git subtree pull --squash --prefix plugins/experimentation git@github.com:adobe/aem-experimentation.git main
 ```
 
-If you prefer using `https` links you'd replace `git@github.com:adobe/aem-experience-decisioning.git` in the above commands by `https://github.com/adobe/aem-experience-decisioning.git`.
+If you prefer using `https` links you'd replace `git@github.com:adobe/aem-experimentation.git` in the above commands by `https://github.com/adobe/aem-experimentation.git`.
 
 ## Project instrumentation
 
@@ -43,13 +43,12 @@ const AUDIENCES = {
   // define your custom audiences here as needed
 };
 
-window.hlx.plugins.add('experience-decisioning', {
+window.hlx.plugins.add('experimentation', {
   condition: () => getMetadata('experiment')
     || Object.keys(getAllMetadata('campaign')).length
     || Object.keys(getAllMetadata('audience')).length,
   options: { audiences: AUDIENCES },
-  load: 'eager',
-  url: '/plugins/experience-decisioning/src/index.js',
+  url: '/plugins/experimentation/src/index.js',
 });
 ```
 
@@ -103,7 +102,7 @@ To properly connect and configure the plugin for your project, you'll need to ed
         || Object.keys(getAllMetadata('campaign')).length
         || Object.keys(getAllMetadata('audience')).length) {
         // eslint-disable-next-line import/no-relative-packages
-        const { loadEager: runEager } = await import('../plugins/experience-decisioning/src/index.js');
+        const { loadEager: runEager } = await import('../plugins/experimentation/src/index.js');
         await runEager(document, { audiences: AUDIENCES }, pluginContext);
       }
       …
@@ -119,7 +118,7 @@ To properly connect and configure the plugin for your project, you'll need to ed
         || Object.keys(getAllMetadata('campaign')).length
         || Object.keys(getAllMetadata('audience')).length)) {
         // eslint-disable-next-line import/no-relative-packages
-        const { loadLazy: runLazy } = await import('../plugins/experience-decisioning/src/index.js');
+        const { loadLazy: runLazy } = await import('../plugins/experimentation/src/index.js');
         await runLazy(document, { audiences: AUDIENCES }, pluginContext);
       }
     }
@@ -168,6 +167,6 @@ runEager.call(pluginContext, {
 ```
 
 For detailed implementation instructions on the different features, please read the dedicated pages we have on those topics:
-- [Audiences](https://github.com/adobe/aem-experience-decisioning/wiki/Audiences)
-- [Campaigns](https://github.com/adobe/aem-experience-decisioning/wiki/Campaigns)
-- [Experiments](https://github.com/adobe/aem-experience-decisioning/wiki/Experiments)
+- [Audiences](https://github.com/adobe/aem-experimentation/wiki/Audiences)
+- [Campaigns](https://github.com/adobe/aem-experimentation/wiki/Campaigns)
+- [Experiments](https://github.com/adobe/aem-experimentation/wiki/Experiments)
