@@ -92,6 +92,8 @@ async function replaceInner(path, element) {
     const html = await resp.text();
     // eslint-disable-next-line no-param-reassign
     element.innerHTML = html;
+    // expose served experience path
+    window.hlx.servedExperience = path;
     return true;
   } catch (e) {
     // eslint-disable-next-line no-console
