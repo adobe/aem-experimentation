@@ -434,7 +434,7 @@ export async function runExperiment(document, options, context) {
 
   // Fullpage content experiment
   document.body.classList.add(`experiment-${experimentConfig.id}`);
-  const result = await replaceInner(pages[0], document.querySelector('main'));
+  const result = await replaceInner(pages[index], document.querySelector('main'));
   if (!result) {
     // eslint-disable-next-line no-console
     console.debug(`failed to serve variant ${window.hlx.experiment.selectedVariant}. Falling back to ${experimentConfig.variantNames[0]}.`);
