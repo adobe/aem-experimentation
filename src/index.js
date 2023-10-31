@@ -435,7 +435,7 @@ export async function runExperiment(document, options, context) {
   // Fullpage content experiment
   document.body.classList.add(`experiment-${experimentConfig.id}`);
   const result = await replaceInner(pages[index], document.querySelector('main'));
-  experimentConfig.servedUrl = result ? pages[index] : window.location.pathname;
+  experimentConfig.servedExperience = result ? pages[index] : currentPath;
   if (!result) {
     // eslint-disable-next-line no-console
     console.debug(`failed to serve variant ${window.hlx.experiment.selectedVariant}. Falling back to ${experimentConfig.variantNames[0]}.`);
@@ -487,7 +487,7 @@ export async function runCampaign(document, options, context) {
   try {
     const url = new URL(urlString);
     const result = replaceInner(url.pathname, document.querySelector('main'));
-    window.hlx.campaign.servedUrl = result ? url.pathname : window.location.pathname;
+    window.hlx.campaign.servedExperience = result ? url.pathname : window.location.pathname;
     if (!result) {
       // eslint-disable-next-line no-console
       console.debug(`failed to serve campaign ${campaign}. Falling back to default content.`);
@@ -541,7 +541,7 @@ export async function serveAudience(document, options, context) {
   try {
     const url = new URL(urlString);
     const result = replaceInner(url.pathname, document.querySelector('main'));
-    window.hlx.audience.servedUrl = result ? url.pathname : window.location.pathname;
+    window.hlx.audience.servedExperience = result ? url.pathname : window.location.pathname;
     if (!result) {
       // eslint-disable-next-line no-console
       console.debug(`failed to serve audience ${selectedAudience}. Falling back to default content.`);
