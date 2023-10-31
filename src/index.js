@@ -76,7 +76,7 @@ export async function getResolvedAudiences(applicableAudiences, options, context
  * Replaces element with content from path
  * @param {string} path
  * @param {HTMLElement} element
- * @param {boolean} isBlock
+ * @return Returns the path that was loaded or null if the loading failed
  */
 async function replaceInner(path, element) {
   const plainPath = path.endsWith('/')
@@ -92,12 +92,12 @@ async function replaceInner(path, element) {
     const html = await resp.text();
     // eslint-disable-next-line no-param-reassign
     element.innerHTML = html;
-    return true;
+    return plainPath;
   } catch (e) {
     // eslint-disable-next-line no-console
     console.log(`error loading content: ${plainPath}`, e);
   }
-  return false;
+  return null;
 }
 
 /**
@@ -435,7 +435,7 @@ export async function runExperiment(document, options, context) {
   // Fullpage content experiment
   document.body.classList.add(`experiment-${experimentConfig.id}`);
   const result = await replaceInner(pages[index], document.querySelector('main'));
-  experimentConfig.servedExperience = result ? pages[index] : currentPath;
+  experimentConfig.servedExperience = result || currentPath;
   if (!result) {
     // eslint-disable-next-line no-console
     console.debug(`failed to serve variant ${window.hlx.experiment.selectedVariant}. Falling back to ${experimentConfig.variantNames[0]}.`);
@@ -487,7 +487,7 @@ export async function runCampaign(document, options, context) {
   try {
     const url = new URL(urlString);
     const result = replaceInner(url.pathname, document.querySelector('main'));
-    window.hlx.campaign.servedExperience = result ? url.pathname : window.location.pathname;
+    window.hlx.campaign.servedExperience = result || window.location.pathname;
     if (!result) {
       // eslint-disable-next-line no-console
       console.debug(`failed to serve campaign ${campaign}. Falling back to default content.`);
@@ -541,7 +541,7 @@ export async function serveAudience(document, options, context) {
   try {
     const url = new URL(urlString);
     const result = replaceInner(url.pathname, document.querySelector('main'));
-    window.hlx.audience.servedExperience = result ? url.pathname : window.location.pathname;
+    window.hlx.audience.servedExperience = result || window.location.pathname;
     if (!result) {
       // eslint-disable-next-line no-console
       console.debug(`failed to serve audience ${selectedAudience}. Falling back to default content.`);
