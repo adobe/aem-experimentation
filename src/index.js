@@ -435,6 +435,7 @@ export async function runExperiment(document, options, context) {
   // Fullpage content experiment
   document.body.classList.add(`experiment-${experimentConfig.id}`);
   const result = await replaceInner(pages[index], document.querySelector('main'));
+  experimentConfig.servedUrl = result ? pages[index] : window.location.pathname;
   if (!result) {
     // eslint-disable-next-line no-console
     console.debug(`failed to serve variant ${window.hlx.experiment.selectedVariant}. Falling back to ${experimentConfig.variantNames[0]}.`);
@@ -481,9 +482,12 @@ export async function runCampaign(document, options, context) {
     return false;
   }
 
+  window.hlx.campaign = { selectedCampaign: campaign };
+
   try {
     const url = new URL(urlString);
     const result = replaceInner(url.pathname, document.querySelector('main'));
+    window.hlx.campaign.servedUrl = result ? url.pathname : window.location.pathname;
     if (!result) {
       // eslint-disable-next-line no-console
       console.debug(`failed to serve campaign ${campaign}. Falling back to default content.`);
@@ -526,17 +530,21 @@ export async function serveAudience(document, options, context) {
     ? context.toClassName(usp.get(pluginOptions.audiencesQueryParameter))
     : null;
 
-  const urlString = configuredAudiences[forcedAudience || audiences[0]];
+  const selectedAudience = forcedAudience || audiences[0];
+  const urlString = configuredAudiences[selectedAudience];
   if (!urlString) {
     return false;
   }
 
+  window.hlx.audience = { selectedAudience };
+
   try {
     const url = new URL(urlString);
     const result = replaceInner(url.pathname, document.querySelector('main'));
+    window.hlx.audience.servedUrl = result ? url.pathname : window.location.pathname;
     if (!result) {
       // eslint-disable-next-line no-console
-      console.debug(`failed to serve audience ${forcedAudience || audiences[0]}. Falling back to default content.`);
+      console.debug(`failed to serve audience ${selectedAudience}. Falling back to default content.`);
     }
     document.body.classList.add(audiences.map((audience) => `audience-${audience}`));
     context.sampleRUM('audiences', {
