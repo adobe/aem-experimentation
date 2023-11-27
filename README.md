@@ -1,4 +1,4 @@
-# AEM Edge Delivery Services Experimenation
+# AEM Edge Delivery Services Experimentation
 
 The AEM Experimentation plugin helps you quickly set up experimentation and segmentation on your AEM project. 
 It is currently available to customers in collaboration with AEM Engineering via co-innovation VIP Projects. 
