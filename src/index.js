@@ -417,7 +417,12 @@ export async function runExperiment(document, options, context) {
     console.warn('Invalid experiment config. Please review your metadata, sheet and parser.');
     return false;
   }
-  if (!experimentConfig.run) {
+
+  const usp = new URLSearchParams(window.location.search);
+  const forcedVariant = usp.has(pluginOptions.experimentsQueryParameter)
+    ? usp.get(pluginOptions.experimentsQueryParameter).split('/')[1]
+    : null;
+  if (!experimentConfig.run && !forcedVariant) {
     // eslint-disable-next-line no-console
     console.warn('Experiment will not run. It is either not active or its configured audiences are not resolved.');
     return false;
