@@ -300,7 +300,9 @@ async function decorateExperimentPill(overlay, options, context) {
     },
     config.variantNames.map((vname) => createVariant(experiment, vname, config, options)),
   );
-  pill.classList.add(`is-${context.toClassName(config.status)}`);
+  if (config.run) {
+    pill.classList.add(`is-${context.toClassName(config.status)}`);
+  }
   overlay.append(pill);
 
   const performanceMetrics = await fetchRumData(experiment, options);

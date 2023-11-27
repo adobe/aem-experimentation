@@ -290,7 +290,7 @@ function getConfigForInstantExperiment(
 async function getConfigForFullExperiment(experimentId, pluginOptions, context) {
   let path;
   if (experimentId.includes(`/${pluginOptions.experimentsConfigFile}`)) {
-    path = new URL(experimentId).href;
+    path = new URL(experimentId, window.location.origin).href;
     // eslint-disable-next-line no-param-reassign
     [experimentId] = path.split('/').splice(-2, 1);
   } else {
@@ -378,9 +378,6 @@ async function getConfig(experiment, instantExperiment, pluginOptions, context) 
   );
 
   window.hlx = window.hlx || {};
-  if (!experimentConfig.run) {
-    return false;
-  }
   window.hlx.experiment = experimentConfig;
 
   // eslint-disable-next-line no-console
@@ -418,6 +415,11 @@ export async function runExperiment(document, options, context) {
   if (!experimentConfig || !isValidExperimentationConfig(experimentConfig)) {
     // eslint-disable-next-line no-console
     console.warn('Invalid experiment config. Please review your metadata, sheet and parser.');
+    return false;
+  }
+  if (!experimentConfig.run) {
+    // eslint-disable-next-line no-console
+    console.warn('Experiment will not run. It is either not active or its configured audiences are not resolved.');
     return false;
   }
   // eslint-disable-next-line no-console
