@@ -28,6 +28,8 @@ If you prefer using `https` links you'd replace `git@github.com:adobe/aem-experi
 
 ## Project instrumentation
 
+:warning: The plugin requires that you have a recent RUM instrumentation from the AEM boilerplate that supports `sampleRUM.always`. If you are getting errors that `.on` cannot be called on an `undefined` object, please apply the changes from https://github.com/adobe/aem-boilerplate/pull/247/files to your `lib-franklin.js`.
+
 ### On top of the plugin system
 
 The easiest way to add the plugin is if your project is set up with the plugin system extension in the boilerplate.
