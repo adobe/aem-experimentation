@@ -134,10 +134,13 @@ You have already seen the `audiences` option in the examples above, but here is 
 runEager.call(pluginContext, {
   // Overrides the base path if the plugin was installed in a sub-directory
   basePath: '',
-  // Lets you configure if we are in a prod environment or not
+
+  // Lets you configure the prod environment.
   // (prod environments do not get the pill overlay)
+  prodHost: 'https://my-website.com',
+  // if you have several, or need more complex logic to toggle pill overlay, you can use
   isProd: () => window.location.hostname.endsWith('hlx.page')
-    || window.location.hostname === ('localhost')
+    || window.location.hostname === ('localhost'),
 
   /* Generic properties */
   // RUM sampling rate on regular AEM pages is 1 out of 100 page views
