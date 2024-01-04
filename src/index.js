@@ -431,6 +431,10 @@ export async function runExperiment(document, options, context) {
   console.debug(`running experiment (${window.hlx.experiment.id}) -> ${window.hlx.experiment.selectedVariant}`);
 
   if (experimentConfig.selectedVariant === experimentConfig.variantNames[0]) {
+    context.sampleRUM('experiment', {
+      source: experimentConfig.id,
+      target: experimentConfig.selectedVariant,
+    });
     return false;
   }
 
