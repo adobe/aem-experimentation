@@ -10,6 +10,8 @@
  * governing permissions and limitations under the License.
  */
 
+const DOMAIN_KEY_NAME = 'aem-domainkey';
+
 function createPreviewOverlay(cls) {
   const overlay = document.createElement('div');
   overlay.className = cls;
@@ -177,7 +179,7 @@ async function fetchRumData(experiment, options) {
   resultsURL.searchParams.set('domainKey', options.domainKey);
   // restrict results to the production host, this also reduces query cost
   if (typeof options.isProd === 'function' && options.isProd()) {
-    resultsURL.searchParams.set('domain', window.location.origin);
+    resultsURL.searchParams.set('domain', window.location.host);
   } else if (options.prodHost) {
     resultsURL.searchParams.set('domain', options.prodHost);
   }
@@ -312,7 +314,7 @@ async function decorateExperimentPill(overlay, options, context) {
   // eslint-disable-next-line no-console
   console.log('preview experiment', experiment);
 
-  const domainKey = window.localStorage.getItem('franklin-domainkey');
+  const domainKey = window.localStorage.getItem(DOMAIN_KEY_NAME);
   const pill = createPopupButton(
     `Experiment: ${config.id}`,
     {
@@ -335,10 +337,10 @@ async function decorateExperimentPill(overlay, options, context) {
             // eslint-disable-next-line no-alert
             const key = window.prompt(
               'Please enter your domain key:',
-              window.localStorage.getItem('franklin-domainkey') || '',
+              window.localStorage.getItem(DOMAIN_KEY_NAME) || '',
             );
             if (key && key.match(/[a-f0-9-]+/)) {
-              window.localStorage.setItem('franklin-domainkey', key);
+              window.localStorage.setItem(DOMAIN_KEY_NAME, key);
               const performanceMetrics = await fetchRumData(experiment, {
                 ...options,
                 domainKey: key,
@@ -348,7 +350,7 @@ async function decorateExperimentPill(overlay, options, context) {
               }
               populatePerformanceMetrics(pill, config, performanceMetrics);
             } else if (key === '') {
-              window.localStorage.removeItem('franklin-domainkey');
+              window.localStorage.removeItem(DOMAIN_KEY_NAME);
             }
           },
         },
