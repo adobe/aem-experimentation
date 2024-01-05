@@ -133,7 +133,7 @@ There are various aspects of the plugin that you can configure via options you a
 You have already seen the `audiences` option in the examples above, but here is the full list we support:
 
 ```js
-runEager.call(pluginContext, {
+runEager.call(document, {
   // Overrides the base path if the plugin was installed in a sub-directory
   basePath: '',
 
@@ -168,7 +168,7 @@ runEager.call(pluginContext, {
   experimentsConfigFile: 'manifest.json',
   experimentsMetaTag: 'experiment',
   experimentsQueryParameter: 'experiment',
-});
+}, pluginContext);
 ```
 
 For detailed implementation instructions on the different features, please read the dedicated pages we have on those topics:
