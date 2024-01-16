@@ -451,14 +451,14 @@ export async function runExperiment(document, options, context) {
   }
 
   // Fullpage content experiment
-  document.body.classList.add(`experiment-${experimentConfig.id}`);
+  document.body.classList.add(`experiment-${context.toClassName(experimentConfig.id)}`);
   const result = await replaceInner(pages[index], document.querySelector('main'));
   experimentConfig.servedExperience = result || currentPath;
   if (!result) {
     // eslint-disable-next-line no-console
     console.debug(`failed to serve variant ${window.hlx.experiment.selectedVariant}. Falling back to ${experimentConfig.variantNames[0]}.`);
   }
-  document.body.classList.add(`variant-${result ? experimentConfig.selectedVariant : experimentConfig.variantNames[0]}`);
+  document.body.classList.add(`variant-${context.toClassName(result ? experimentConfig.selectedVariant : experimentConfig.variantNames[0])}`);
   context.sampleRUM('experiment', {
     source: experimentConfig.id,
     target: result ? experimentConfig.selectedVariant : experimentConfig.variantNames[0],
