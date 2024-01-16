@@ -133,6 +133,7 @@
 .hlx-popup h5 {
   font-family: system-ui, sans-serif;
   margin: 0;
+  color: inherit;
 }
 
 .hlx-popup h4 {
