@@ -151,6 +151,10 @@ runEager.call(document, {
   // short durations of those campaigns/experiments
   rumSamplingRate: 10,
 
+  // the storage type used to persist data between page views
+  // (for instance to remember what variant in an experiment the user was served)
+  storage: window.SessionStorage,
+
   /* Audiences related properties */
   // See more details on the dedicated Audiences page linked below
   audiences: {},
