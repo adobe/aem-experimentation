@@ -54,9 +54,9 @@ window.hlx.plugins.add('experimentation', {
 });
 ```
 
-### Without the plugin system
+### On top of a regular boilerplate project
 
-To properly connect and configure the plugin for your project, you'll need to edit your `scripts.js` in your AEM project and add the following:
+Typically, you'd know you don't have the plugin system if you don't see a reference to `window.hlx.plugins` in your `scripts.js`. In that case, you can still manually instrument this plugin in your project by falling back to a more manual instrumentation. To properly connect and configure the plugin for your project, you'll need to edit your `scripts.js` in your AEM project and add the following:
 
 1. at the start of the file:
     ```js
