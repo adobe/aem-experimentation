@@ -190,7 +190,8 @@ async function fetchRumData(experiment, options) {
   }
 
   const { results } = await response.json();
-  if (!results.length) {
+  const { data } = results;
+  if (!data.length) {
     return null;
   }
 
@@ -200,7 +201,7 @@ async function fetchRumData(experiment, options) {
     return o;
   }, {});
 
-  const variantsAsNums = results.map(numberify);
+  const variantsAsNums = data.map(numberify);
   const totals = Object.entries(
     variantsAsNums.reduce((o, v) => {
       Object.entries(v).forEach(([k, val]) => {
