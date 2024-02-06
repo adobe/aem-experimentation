@@ -678,15 +678,16 @@ export async function loadLazy(document, options, context) {
     ...DEFAULT_OPTIONS,
     ...(options || {}),
   };
-  if (window.location.hostname.endsWith('hlx.page')
-    || window.location.hostname === ('localhost')
-    || (typeof options.isProd === 'function' && !options.isProd())
+  // do not show the experimentation pill on prod domains
+  if (window.location.hostname.endsWith('.live')
+    || (typeof options.isProd === 'function' && options.isProd())
     || (options.prodHost
-        && options.prodHost !== window.location.host
-        && options.prodHost !== window.location.hostname
-        && options.prodHost !== window.location.origin)) {
-    // eslint-disable-next-line import/no-cycle
-    const preview = await import('./preview.js');
-    preview.default(document, pluginOptions, { ...context, getResolvedAudiences });
+        && (options.prodHost === window.location.host
+          || options.prodHost === window.location.hostname
+          || options.prodHost === window.location.origin))) {
+    return;
   }
+  // eslint-disable-next-line import/no-cycle
+  const preview = await import('./preview.js');
+  preview.default(document, pluginOptions, { ...context, getResolvedAudiences });
 }
