@@ -19,6 +19,7 @@ export const DEFAULT_OPTIONS = {
   audiences: {},
   audiencesMetaTagPrefix: 'audience',
   audiencesQueryParameter: 'audience',
+  audienceAepPrefix: 'aep',
 
   // Campaigns related properties
   campaignsMetaTagPrefix: 'campaign',
@@ -65,6 +66,16 @@ export async function getResolvedAudiences(applicableAudiences, options, context
       .map((key) => {
         if (options.audiences[key] && typeof options.audiences[key] === 'function') {
           return options.audiences[key]();
+        }
+        if (!options.audiences[key] && key.startsWith(`${options.audienceAepPrefix}-`)) {
+          const rtcdpSegmentId = key.replace(`${options.audienceAepPrefix}-`, '');
+          return import('./aep.js')
+            .then(({ getSegmentsFromAlloy }) => getSegmentsFromAlloy(options.aepConfig))
+            .then((segments) => {
+              console.log('segments', segments);
+              console.log('segment id', rtcdpSegmentId);
+              return segments.includes(rtcdpSegmentId);
+            });
         }
         return false;
       }),
@@ -678,15 +689,16 @@ export async function loadLazy(document, options, context) {
     ...DEFAULT_OPTIONS,
     ...(options || {}),
   };
-  if (window.location.hostname.endsWith('hlx.page')
-    || window.location.hostname === ('localhost')
-    || (typeof options.isProd === 'function' && !options.isProd())
+  // do not show the experimentation pill on prod domains
+  if (window.location.hostname.endsWith('.live')
+    || (typeof options.isProd === 'function' && options.isProd())
     || (options.prodHost
-        && options.prodHost !== window.location.host
-        && options.prodHost !== window.location.hostname
-        && options.prodHost !== window.location.origin)) {
-    // eslint-disable-next-line import/no-cycle
-    const preview = await import('./preview.js');
-    preview.default(document, pluginOptions, { ...context, getResolvedAudiences });
+        && (options.prodHost === window.location.host
+          || options.prodHost === window.location.hostname
+          || options.prodHost === window.location.origin))) {
+    return;
   }
+  // eslint-disable-next-line import/no-cycle
+  const preview = await import('./preview.js');
+  preview.default(document, pluginOptions, { ...context, getResolvedAudiences });
 }
