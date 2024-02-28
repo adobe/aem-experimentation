@@ -482,9 +482,10 @@ export async function runCampaign(document, options, context) {
   }
 
   let audiences = context.getMetadata(`${pluginOptions.campaignsMetaTagPrefix}-audience`);
+  let resolvedAudiences = null;
   if (audiences) {
     audiences = audiences.split(',').map(context.toClassName);
-    const resolvedAudiences = await getResolvedAudiences(audiences, pluginOptions, context);
+    resolvedAudiences = await getResolvedAudiences(audiences, pluginOptions, context);
     if (!!resolvedAudiences && !resolvedAudiences.length) {
       return false;
     }
@@ -501,6 +502,9 @@ export async function runCampaign(document, options, context) {
   }
 
   window.hlx.campaign = { selectedCampaign: campaign };
+  if (resolvedAudiences) {
+    window.hlx.campaign.resolvedAudiences = window.hlx.campaign;
+  }
 
   try {
     const url = new URL(urlString);
