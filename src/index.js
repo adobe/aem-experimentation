@@ -239,7 +239,7 @@ function getConfigForInstantExperiment(
     variantNames: [],
   };
 
-  const pages = instantExperiment.split(',').map((p) => new URL(p.trim()).pathname);
+  const pages = instantExperiment.split(',').map((p) => new URL(p.trim(), window.location).pathname);
 
   const splitString = context.getMetadata(`${pluginOptions.experimentsMetaTag}-split`);
   const splits = splitString
