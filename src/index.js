@@ -233,7 +233,9 @@ function getConfigForInstantExperiment(
   const config = {
     label: `Instant Experiment: ${experimentId}`,
     audiences: audience ? audience.split(',').map(context.toClassName) : [],
-    status: 'Active',
+    status: context.getMetadata(`${pluginOptions.experimentsMetaTag}-status`) || 'Active',
+    startDate: context.getMetadata(`${pluginOptions.experimentsMetaTag}-start-date`),
+    endDate: context.getMetadata(`${pluginOptions.experimentsMetaTag}-end-date`),
     id: experimentId,
     variants: {},
     variantNames: [],
@@ -314,6 +316,7 @@ async function getConfigForFullExperiment(experimentId, pluginOptions, context) 
     config.manifest = path;
     config.basePath = `${pluginOptions.experimentsRoot}/${experimentId}`;
     inferEmptyPercentageSplits(Object.values(config.variants));
+    config.status = context.getMetadata(`${pluginOptions.experimentsMetaTag}-status`) || config.status;
     return config;
   } catch (e) {
     // eslint-disable-next-line no-console
@@ -370,11 +373,13 @@ async function getConfig(experiment, instantExperiment, pluginOptions, context) 
   );
   experimentConfig.run = (
     // experiment is active or forced
-    (context.toCamelCase(experimentConfig.status) === 'active' || forcedExperiment)
+    (['active', 'on', 'true'].includes(context.toCamelCase(experimentConfig.status)) || forcedExperiment)
     // experiment has resolved audiences if configured
     && (!experimentConfig.resolvedAudiences || experimentConfig.resolvedAudiences.length)
     // forced audience resolves if defined
     && (!forcedAudience || experimentConfig.audiences.includes(forcedAudience))
+    && (!experimentConfig.startDate || new Date(experimentConfig.startDate) <= Date.now())
+    && (!experimentConfig.endDate || new Date(experimentConfig.endDate) > Date.now())
   );
 
   window.hlx = window.hlx || {};
