@@ -508,7 +508,7 @@ export async function runCampaign(document, options, context) {
 
   try {
     const url = new URL(urlString);
-    const result = replaceInner(url.pathname, document.querySelector('main'));
+    const result = await replaceInner(url.pathname, document.querySelector('main'));
     window.hlx.campaign.servedExperience = result || window.location.pathname;
     if (!result) {
       // eslint-disable-next-line no-console
@@ -562,7 +562,7 @@ export async function serveAudience(document, options, context) {
 
   try {
     const url = new URL(urlString);
-    const result = replaceInner(url.pathname, document.querySelector('main'));
+    const result = await replaceInner(url.pathname, document.querySelector('main'));
     window.hlx.audience.servedExperience = result || window.location.pathname;
     if (!result) {
       // eslint-disable-next-line no-console
