@@ -373,7 +373,7 @@ async function getConfig(experiment, instantExperiment, pluginOptions, context) 
   );
   experimentConfig.run = (
     // experiment is active or forced
-    (['active', 'on', 'true'].includes(context.toCamelCase(experimentConfig.status)) || forcedExperiment)
+    (['active', 'on', 'true'].includes(context.toClassName(experimentConfig.status)) || forcedExperiment)
     // experiment has resolved audiences if configured
     && (!experimentConfig.resolvedAudiences || experimentConfig.resolvedAudiences.length)
     // forced audience resolves if defined
