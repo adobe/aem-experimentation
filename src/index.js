@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 Adobe. All rights reserved.
+ * Copyright 2024 Adobe. All rights reserved.
  * This file is licensed to you under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License. You may obtain a copy
  * of the License at http://www.apache.org/licenses/LICENSE-2.0
@@ -11,9 +11,30 @@
  */
 const MAX_SAMPLING_RATE = 10; // At a maximum we sample 1 in 10 requests
 
+let isDebugEnabled;
+export function setDebugMode(pluginOptions) {
+  const { host, hostname, origin } = window.location;
+  const { isProd, prodHost } = pluginOptions;
+  isDebugEnabled = (window.location.hostname === 'localhost'
+    || window.location.hostname.endsWith('.page')
+    || (typeof isProd === 'function' && !isProd())
+    || (prodHost && ![host, hostname, origin].includes(prodHost)));
+  return isDebugEnabled;
+}
+
+export function debug(...args) {
+  if (isDebugEnabled) {
+    // eslint-disable-next-line no-console
+    console.debug.call(this, '[aem-experimentation]', ...args);
+  }
+}
+
 export const DEFAULT_OPTIONS = {
+
   // Generic properties
+  decorationCallback: () => {},
   rumSamplingRate: MAX_SAMPLING_RATE, // 1 in 10 requests
+  trackingFunction: window.hlx?.rum?.sampleRUM,
 
   // Audiences related properties
   audiences: {},
@@ -25,60 +46,153 @@ export const DEFAULT_OPTIONS = {
   campaignsQueryParameter: 'campaign',
 
   // Experimentation related properties
-  experimentsRoot: '/experiments',
-  experimentsConfigFile: 'manifest.json',
-  experimentsMetaTag: 'experiment',
+  experimentsMetaTagPrefix: 'experiment',
   experimentsQueryParameter: 'experiment',
 };
 
 /**
- * Checks if the current engine is detected as being a bot.
- * @returns `true` if the current engine is detected as being, `false` otherwise
+ * Converts a given comma-seperate string to an array.
+ * @param {String|String[]} str The string to convert
+ * @returns an array representing the converted string
  */
-function isBot() {
-  return navigator.userAgent.match(/bot|crawl|spider/i);
+export function stringToArray(str) {
+  if (Array.isArray(str)) {
+    return str;
+  }
+  return str ? str.split(/[,\n]/).filter((s) => s.trim()) : [];
 }
 
 /**
- * Checks if any of the configured audiences on the page can be resolved.
- * @param {string[]} applicableAudiences a list of configured audiences for the page
- * @param {object} options the plugin options
- * @returns Returns the names of the resolved audiences, or `null` if no audience is configured
+ * Sanitizes a name for use as class name.
+ * @param {String} name The unsanitized name
+ * @returns {String} The class name
  */
-export async function getResolvedAudiences(applicableAudiences, options, context) {
-  if (!applicableAudiences.length || !Object.keys(options.audiences).length) {
-    return null;
-  }
-  // If we have a forced audience set in the query parameters (typically for simulation purposes)
-  // we check if it is applicable
-  const usp = new URLSearchParams(window.location.search);
-  const forcedAudience = usp.has(options.audiencesQueryParameter)
-    ? context.toClassName(usp.get(options.audiencesQueryParameter))
-    : null;
-  if (forcedAudience) {
-    return applicableAudiences.includes(forcedAudience) ? [forcedAudience] : [];
-  }
+export function toClassName(name) {
+  return typeof name === 'string'
+    ? name.toLowerCase().replace(/[^0-9a-z]/gi, '-').replace(/-+/g, '-').replace(/^-|-$/g, '')
+    : '';
+}
 
-  // Otherwise, return the list of audiences that are resolved on the page
-  const results = await Promise.all(
-    applicableAudiences
-      .map((key) => {
-        if (options.audiences[key] && typeof options.audiences[key] === 'function') {
-          return options.audiences[key]();
+/**
+ * Sanitizes a name for use as a js property name.
+ * @param {String} name The unsanitized name
+ * @returns {String} The camelCased name
+ */
+export function toCamelCase(name) {
+  return toClassName(name).replace(/-([a-z])/g, (g) => g[1].toUpperCase());
+}
+
+/**
+ * Retrieves the content of metadata tags.
+ * @param {String} name The metadata name (or property)
+ * @returns {String} The metadata value(s)
+ */
+export function getMetadata(name) {
+  const attr = name && name.includes(':') ? 'property' : 'name';
+  const meta = [...document.head.querySelectorAll(`meta[${attr}="${name}"]`)].map((m) => m.content).join(', ');
+  return meta || '';
+}
+
+/**
+ * Gets all the metadata elements that are in the given scope.
+ * @param {String} scope The scope/prefix for the metadata
+ * @returns a map of key/value pairs for the given scope
+ */
+export function getAllMetadata(scope) {
+  const value = getMetadata(scope);
+  return [...document.head.querySelectorAll(`meta[property^="${scope}:"],meta[name^="${scope}-"]`)]
+    .reduce((res, meta) => {
+      const key = toCamelCase(meta.name
+        ? meta.name.substring(scope.length + 1)
+        : meta.getAttribute('property').split(':')[1]);
+      res[key] = meta.getAttribute('content');
+      return res;
+    }, value ? { value } : {});
+}
+
+/**
+ * Gets all the data attributes that are in the given scope.
+ * @param {String} scope The scope/prefix for the metadata
+ * @returns a map of key/value pairs for the given scope
+ */
+function getAllDataAttributes(el, scope) {
+  return el.getAttributeNames()
+    .filter((attr) => attr === `data-${scope}` || attr.startsWith(`data-${scope}-`))
+    .reduce((res, attr) => {
+      const key = attr === `data-${scope}` ? 'value' : attr.replace(`data-${scope}-`, '');
+      res[key] = el.getAttribute(attr);
+      return res;
+    }, {});
+}
+
+/**
+ * Gets all the query parameters that are in the given scope.
+ * @param {String} scope The scope/prefix for the metadata
+ * @returns a map of key/value pairs for the given scope
+ */
+function getAllQueryParameters(scope) {
+  const usp = new URLSearchParams(window.location.search);
+  return [...usp.entries()]
+    .filter(([param]) => param === scope || param.startsWith(`${scope}-`))
+    .reduce((res, [param, value]) => {
+      const key = param === scope ? 'value' : param.replace(`${scope}-`, '');
+      if (res[key]) {
+        res[key] = [].concat(res[key], value);
+      } else {
+        res[key] = value;
+      }
+      return res;
+    }, {});
+}
+
+/**
+ * Extracts the config from a block that is in the given scope.
+ * @param {HTMLElement} block The block element
+ * @returns a map of key/value pairs for the given scope
+ */
+// eslint-disable-next-line import/prefer-default-export
+function getAllSectionMeta(block, scope) {
+  const config = {};
+  block.querySelectorAll(':scope > div').forEach((row) => {
+    if (row.children) {
+      const cols = [...row.children];
+      if (cols[1]) {
+        const col = cols[1];
+        let key = toClassName(cols[0].textContent);
+        if (key !== scope && !key.startsWith(`${scope}-`)) {
+          return;
         }
-        return false;
-      }),
-  );
-  return applicableAudiences.filter((_, i) => results[i]);
+        key = key === scope ? 'value' : key.replace(`${scope}-`, '');
+        let value = '';
+        if (col.querySelector('a')) {
+          const as = [...col.querySelectorAll('a')];
+          if (as.length === 1) {
+            value = as[0].href;
+          } else {
+            value = as.map((a) => a.href);
+          }
+        } else if (col.querySelector('p')) {
+          const ps = [...col.querySelectorAll('p')];
+          if (ps.length === 1) {
+            value = ps[0].textContent;
+          } else {
+            value = ps.map((p) => p.textContent);
+          }
+        } else value = row.children[1].textContent;
+        config[key] = value;
+      }
+    }
+  });
+  return config;
 }
 
 /**
  * Replaces element with content from path
- * @param {string} path
- * @param {HTMLElement} main
+ * @param {String} path
+ * @param {HTMLElement} el
  * @return Returns the path that was loaded or null if the loading failed
  */
-async function replaceInner(path, main) {
+async function replaceInner(path, el) {
   try {
     const resp = await fetch(path);
     if (!resp.ok) {
@@ -89,9 +203,9 @@ async function replaceInner(path, main) {
     const html = await resp.text();
     // parse with DOMParser to guarantee valid HTML, and no script execution(s)
     const dom = new DOMParser().parseFromString(html, 'text/html');
-    // do not use replaceWith API here since this would replace the main reference
-    // in scripts.js as well and prevent proper decoration of the sections/blocks
-    main.innerHTML = dom.querySelector('main').innerHTML;
+    // eslint-disable-next-line no-param-reassign
+    const newEl = dom.querySelector(el.tagName === 'MAIN' ? 'main' : 'main > div');
+    el.innerHTML = newEl.innerHTML;
     return path;
   } catch (e) {
     // eslint-disable-next-line no-console
@@ -101,93 +215,36 @@ async function replaceInner(path, main) {
 }
 
 /**
- * Parses the experimentation configuration sheet and creates an internal model.
- *
- * Output model is expected to have the following structure:
- *      {
- *        id: <string>,
- *        label: <string>,
- *        blocks: <string>,
- *        audiences: [<string>],
- *        status: Active | Inactive,
- *        variantNames: [<string>],
- *        variants: {
- *          [variantName]: {
- *            label: <string>
- *            percentageSplit: <number 0-1>,
- *            pages: <string>,
- *            blocks: <string>,
- *          }
- *        }
- *      };
+ * Checks if any of the configured audiences on the page can be resolved.
+ * @param {String[]} pageAudiences a list of configured audiences for the page
+ * @param {Object} options the plugin options
+ * @returns Returns the names of the resolved audiences, or `null` if no audience is configured
  */
-function parseExperimentConfig(json, context) {
-  const config = {};
-  try {
-    json.settings.data.forEach((line) => {
-      const key = context.toCamelCase(line.Name);
-      if (key === 'audience' || key === 'audiences') {
-        config.audiences = line.Value ? line.Value.split(',').map((str) => str.trim()) : [];
-      } else if (key === 'experimentName') {
-        config.label = line.Value;
-      } else {
-        config[key] = line.Value;
-      }
-    });
-    const variants = {};
-    let variantNames = Object.keys(json.experiences.data[0]);
-    variantNames.shift();
-    variantNames = variantNames.map((vn) => context.toCamelCase(vn));
-    variantNames.forEach((variantName) => {
-      variants[variantName] = {};
-    });
-    let lastKey = 'default';
-    json.experiences.data.forEach((line) => {
-      let key = context.toCamelCase(line.Name);
-      if (!key) key = lastKey;
-      lastKey = key;
-      const vns = Object.keys(line);
-      vns.shift();
-      vns.forEach((vn) => {
-        const camelVN = context.toCamelCase(vn);
-        if (key === 'pages' || key === 'blocks') {
-          variants[camelVN][key] = variants[camelVN][key] || [];
-          if (key === 'pages') variants[camelVN][key].push(new URL(line[vn]).pathname);
-          else variants[camelVN][key].push(line[vn]);
-        } else {
-          variants[camelVN][key] = line[vn];
-        }
-      });
-    });
-    config.variants = variants;
-    config.variantNames = variantNames;
-    return config;
-  } catch (e) {
-    // eslint-disable-next-line no-console
-    console.log('error parsing experiment config:', e, json);
+export async function getResolvedAudiences(pageAudiences, options) {
+  if (!pageAudiences.length || !Object.keys(options.audiences).length) {
+    return null;
   }
-  return null;
-}
+  // If we have a forced audience set in the query parameters (typically for simulation purposes)
+  // we check if it is applicable
+  const usp = new URLSearchParams(window.location.search);
+  const forcedAudience = usp.has(options.audiencesQueryParameter)
+    ? toClassName(usp.get(options.audiencesQueryParameter))
+    : null;
+  if (forcedAudience) {
+    return pageAudiences.includes(forcedAudience) ? [forcedAudience] : [];
+  }
 
-/**
- * Checks if the given config is a valid experimentation configuration.
- * @param {object} config the config to check
- * @returns `true` if it is valid, `false` otherwise
- */
-export function isValidExperimentationConfig(config) {
-  if (!config.variantNames
-    || !config.variantNames.length
-    || !config.variants
-    || !Object.values(config.variants).length
-    || !Object.values(config.variants).every((v) => (
-      typeof v === 'object'
-      && !!v.blocks
-      && !!v.pages
-      && (v.percentageSplit === '' || !!v.percentageSplit)
-    ))) {
-    return false;
-  }
-  return true;
+  // Otherwise, return the list of audiences that are resolved on the page
+  const results = await Promise.all(
+    pageAudiences
+      .map((key) => {
+        if (options.audiences[key] && typeof options.audiences[key] === 'function') {
+          return options.audiences[key]();
+        }
+        return false;
+      }),
+  );
+  return pageAudiences.filter((_, i) => results[i]);
 }
 
 /**
@@ -217,118 +274,11 @@ function inferEmptyPercentageSplits(variants) {
 }
 
 /**
- * Gets experiment config from the metadata.
- *
- * @param {string} experimentId The experiment identifier
- * @param {string} instantExperiment The list of varaints
- * @returns {object} the experiment manifest
+ * Converts the experiment config to a decision policy
+ * @param {Object} config The experiment config
+ * @returns a decision policy for the experiment config
  */
-function getConfigForInstantExperiment(
-  experimentId,
-  instantExperiment,
-  pluginOptions,
-  context,
-) {
-  const audience = context.getMetadata(`${pluginOptions.experimentsMetaTag}-audience`);
-  const config = {
-    label: `Instant Experiment: ${experimentId}`,
-    audiences: audience ? audience.split(',').map(context.toClassName) : [],
-    status: context.getMetadata(`${pluginOptions.experimentsMetaTag}-status`) || 'Active',
-    startDate: context.getMetadata(`${pluginOptions.experimentsMetaTag}-start-date`),
-    endDate: context.getMetadata(`${pluginOptions.experimentsMetaTag}-end-date`),
-    id: experimentId,
-    variants: {},
-    variantNames: [],
-  };
-
-  const nbOfVariants = Number(instantExperiment);
-  const pages = Number.isNaN(nbOfVariants)
-    ? instantExperiment.split(',').map((p) => new URL(p.trim(), window.location).pathname)
-    : new Array(nbOfVariants).fill(window.location.pathname);
-
-  const splitString = context.getMetadata(`${pluginOptions.experimentsMetaTag}-split`);
-  const splits = splitString
-    // custom split
-    ? splitString.split(',').map((i) => parseFloat(i) / 100)
-    // even split fallback
-    : [...new Array(pages.length)].map(() => 1 / (pages.length + 1));
-
-  config.variantNames.push('control');
-  config.variants.control = {
-    percentageSplit: '',
-    pages: [window.location.pathname],
-    blocks: [],
-    label: 'Control',
-  };
-
-  pages.forEach((page, i) => {
-    const vname = `challenger-${i + 1}`;
-    config.variantNames.push(vname);
-    config.variants[vname] = {
-      percentageSplit: `${splits[i].toFixed(4)}`,
-      pages: [page],
-      blocks: [],
-      label: `Challenger ${i + 1}`,
-    };
-  });
-  inferEmptyPercentageSplits(Object.values(config.variants));
-  return (config);
-}
-
-/**
- * Gets experiment config from the manifest and transforms it to more easily
- * consumable structure.
- *
- * the manifest consists of two sheets "settings" and "experiences", by default
- *
- * "settings" is applicable to the entire test and contains information
- * like "Audience", "Status" or "Blocks".
- *
- * "experience" hosts the experiences in rows, consisting of:
- * a "Percentage Split", "Label" and a set of "Links".
- *
- *
- * @param {string} experimentId The experiment identifier
- * @param {object} pluginOptions The plugin options
- * @returns {object} containing the experiment manifest
- */
-async function getConfigForFullExperiment(experimentId, pluginOptions, context) {
-  let path;
-  if (experimentId.includes(`/${pluginOptions.experimentsConfigFile}`)) {
-    path = new URL(experimentId, window.location.origin).href;
-    // eslint-disable-next-line no-param-reassign
-    [experimentId] = path.split('/').splice(-2, 1);
-  } else {
-    path = `${pluginOptions.experimentsRoot}/${experimentId}/${pluginOptions.experimentsConfigFile}`;
-  }
-  try {
-    const resp = await fetch(path);
-    if (!resp.ok) {
-      // eslint-disable-next-line no-console
-      console.log('error loading experiment config:', resp);
-      return null;
-    }
-    const json = await resp.json();
-    const config = pluginOptions.parser
-      ? pluginOptions.parser(json, context)
-      : parseExperimentConfig(json, context);
-    if (!config) {
-      return null;
-    }
-    config.id = experimentId;
-    config.manifest = path;
-    config.basePath = `${pluginOptions.experimentsRoot}/${experimentId}`;
-    inferEmptyPercentageSplits(Object.values(config.variants));
-    config.status = context.getMetadata(`${pluginOptions.experimentsMetaTag}-status`) || config.status;
-    return config;
-  } catch (e) {
-    // eslint-disable-next-line no-console
-    console.log(`error loading experiment manifest: ${path}`, e);
-  }
-  return null;
-}
-
-function getDecisionPolicy(config) {
+function toDecisionPolicy(config) {
   const decisionPolicy = {
     id: 'content-experimentation-policy',
     rootDecisionNodeId: 'n1',
@@ -349,317 +299,531 @@ function getDecisionPolicy(config) {
   return decisionPolicy;
 }
 
-async function getConfig(experiment, instantExperiment, pluginOptions, context) {
-  const usp = new URLSearchParams(window.location.search);
-  const [forcedExperiment, forcedVariant] = usp.has(pluginOptions.experimentsQueryParameter)
-    ? usp.get(pluginOptions.experimentsQueryParameter).split('/')
-    : [];
+/**
+ * Creates an instance of a modification handler that will be responsible for applying the desired
+ * personalized experience.
+ *
+ * @param {Object} overrides The config overrides
+ * @param {Function} metadataToConfig a function that will handle the parsing of the metadata
+ * @param {Function} getExperienceUrl a function that returns the URL to the experience
+ * @param {Object} pluginOptions the plugin options
+ * @param {Function} cb the callback to handle the final steps
+ * @returns the modification handler
+ */
+function createModificationsHandler(
+  overrides,
+  metadataToConfig,
+  getExperienceUrl,
+  pluginOptions,
+  cb,
+) {
+  return async (el, metadata) => {
+    const config = await metadataToConfig(pluginOptions, metadata, overrides);
+    if (!config) {
+      return null;
+    }
+    const ns = { config, el };
+    const url = await getExperienceUrl(ns.config);
+    let res;
+    if (url && new URL(url, window.location.origin).pathname !== window.location.pathname) {
+      res = await replaceInner(url, el);
+    } else {
+      res = url;
+    }
+    cb(el.tagName === 'MAIN' ? document.body : ns.el, ns.config, res ? url : null);
+    if (res) {
+      ns.servedExperience = url;
+    }
+    return ns;
+  };
+}
 
-  const experimentConfig = instantExperiment
-    ? await getConfigForInstantExperiment(experiment, instantExperiment, pluginOptions, context)
-    : await getConfigForFullExperiment(experiment, pluginOptions, context);
+/**
+ * Fetch the configuration entries from a JSON manifest.
+ * @param {String} urlString the URL to load
+ * @returns the list of entries that apply to the current page
+ */
+async function getManifestEntriesForCurrentPage(urlString) {
+  try {
+    const url = new URL(urlString, window.location.origin);
+    const response = await fetch(url);
+    const json = await response.json();
+    return json.data
+      .map((entry) => Object.keys(entry).reduce((res, k) => {
+        res[k.toLowerCase()] = entry[k];
+        return res;
+      }, {}))
+      .filter((entry) => !entry.page || entry.page === window.location.pathname)
+      .filter((entry) => entry.selector)
+      .filter((entry) => entry.url);
+  } catch (err) {
+    // eslint-disable-next-line no-console
+    console.warn('Cannot apply manifest: ', urlString, err);
+  }
+  return null;
+}
 
-  // eslint-disable-next-line no-console
-  console.debug(experimentConfig);
-  if (!experimentConfig) {
+/**
+ * Watches the page for injected DOM elements and automatically applies the fragment customizations
+ */
+function watchMutationsAndApplyFragments(
+  ns,
+  scope,
+  entries,
+  aggregator,
+  getExperienceUrl,
+  pluginOptions,
+  metadataToConfig,
+  overrides,
+  cb,
+) {
+  if (!entries.length) {
+    return;
+  }
+
+  new MutationObserver(async (_, observer) => {
+    // eslint-disable-next-line no-restricted-syntax
+    for (const entry of entries) {
+      // eslint-disable-next-line no-await-in-loop
+      const config = await metadataToConfig(pluginOptions, entry, overrides);
+      if (!config || entry.isApplied) {
+        return;
+      }
+      const el = scope.querySelector(entry.selector);
+      if (!el) {
+        return;
+      }
+      entry.isApplied = true;
+      const fragmentNS = { config, el };
+      // eslint-disable-next-line no-await-in-loop
+      const url = await getExperienceUrl(fragmentNS.config);
+      let res;
+      if (url && new URL(url, window.location.origin).pathname !== window.location.pathname) {
+        // eslint-disable-next-line no-await-in-loop
+        res = await replaceInner(url, el);
+      } else {
+        res = url;
+      }
+      cb(el.tagName === 'MAIN' ? document.body : fragmentNS.el, fragmentNS.config, res ? url : null);
+      if (res) {
+        fragmentNS.servedExperience = url;
+      }
+      debug('fragment', ns, fragmentNS);
+      aggregator.push(fragmentNS);
+    }
+    if (entries.every((entry) => entry.isApplied)) {
+      observer.disconnect();
+    }
+  }).observe(scope, { childList: true, subtree: true });
+}
+
+/**
+ * Apply the page modifications for the specified type.
+ *
+ * @param {String} ns the type of modifications to do
+ * @param {String} paramNS the query parameter namespace
+ * @param {Object} pluginOptions the plugin options
+ * @param {Function} metadataToConfig a function that will handle the parsing of the metadata
+ * @param {Function} manifestToConfig a function that will handle the parsing of the manifest
+ * @param {Function} getExperienceUrl a function that returns the URL to the experience
+ * @param {Function} cb the callback to handle the final steps
+ * @returns an object containing the details of the page modifications that where applied
+ */
+async function applyAllModifications(
+  ns,
+  paramNS,
+  pluginOptions,
+  metadataToConfig,
+  manifestToConfig,
+  getExperienceUrl,
+  cb,
+) {
+  const modificationsHandler = createModificationsHandler(
+    getAllQueryParameters(paramNS),
+    metadataToConfig,
+    getExperienceUrl,
+    pluginOptions,
+    cb,
+  );
+
+  const fragmentsNS = [];
+
+  // Full-page modifications
+  const pageMetadata = getAllMetadata(ns);
+  const pageNS = await modificationsHandler(
+    document.querySelector('main'),
+    pageMetadata,
+  );
+  if (pageNS) {
+    debug('page', ns, pageNS);
+  }
+
+  // Section-level modifications
+  let sectionMetadata;
+  const sectionsNS = [];
+  await Promise.all([...document.querySelectorAll('.section-metadata')]
+    .map(async (sm) => {
+      sectionMetadata = getAllSectionMeta(sm, ns);
+      const sectionNS = await modificationsHandler(
+        sm.parentElement,
+        sectionMetadata,
+      );
+      if (sectionNS) {
+        debug('section', ns, sectionNS);
+        sectionsNS.push(sectionNS);
+      }
+    }));
+
+  if (pageMetadata.manifest) {
+    const entries = manifestToConfig(await getManifestEntriesForCurrentPage(pageMetadata.manifest));
+    watchMutationsAndApplyFragments(
+      ns,
+      document.body,
+      entries,
+      fragmentsNS,
+      getExperienceUrl,
+      pluginOptions,
+      metadataToConfig,
+      getAllQueryParameters(paramNS),
+      cb,
+    );
+  }
+
+  return { page: pageNS, sections: sectionsNS, fragments: fragmentsNS };
+}
+
+function aggregateEntries(type, allowedMultiValuesProperties) {
+  return (entries) => entries.reduce((aggregator, entry) => {
+    Object.entries(entry).forEach(([key, value]) => {
+      if (!aggregator[key]) {
+        aggregator[key] = value;
+      } else if (aggregator[key] !== value) {
+        if (allowedMultiValuesProperties.test(key)) {
+          aggregator[key] = [].concat(aggregator[key], value);
+        } else {
+          // eslint-disable-next-line no-console
+          console.warn(`Key "${key}" in the ${type} manifest must be the same for every variant on the page.`);
+        }
+      }
+    });
+    return aggregator;
+  }, {});
+}
+
+/**
+ * Parses the experiment configuration from the metadata
+ */
+async function getExperimentConfig(pluginOptions, metadata, overrides) {
+  const id = toClassName(metadata.value || metadata.experiment);
+  if (!id) {
     return null;
   }
 
-  const forcedAudience = usp.has(pluginOptions.audiencesQueryParameter)
-    ? context.toClassName(usp.get(pluginOptions.audiencesQueryParameter))
-    : null;
+  let pages = metadata.variants || metadata.url;
 
-  experimentConfig.resolvedAudiences = await getResolvedAudiences(
-    experimentConfig.audiences.map(context.toClassName),
+  // Backward compatibility
+  if (!pages) {
+    pages = getMetadata('instant-experiment');
+  }
+  if (metadata.audience) {
+    metadata.audiences = metadata.audience;
+  }
+
+  const nbOfVariants = Number(pages);
+  pages = Number.isNaN(nbOfVariants)
+    ? stringToArray(pages).map((p) => new URL(p.trim(), window.location).pathname)
+    : new Array(nbOfVariants).fill(window.location.pathname);
+  if (!pages.length) {
+    return null;
+  }
+
+  const audiences = stringToArray(metadata.audiences).map(toClassName);
+
+  const splits = metadata.split
+    // custom split
+    ? stringToArray(metadata.split).map((i) => parseFloat(i) / 100)
+    // even split
+    : [...new Array(pages.length)].map(() => 1 / (pages.length + 1));
+
+  const variantNames = [];
+  variantNames.push('control');
+
+  const variants = {};
+  variants.control = {
+    percentageSplit: '',
+    pages: [window.location.pathname],
+    label: 'Control',
+  };
+
+  pages.forEach((page, i) => {
+    const vname = `challenger-${i + 1}`;
+    variantNames.push(vname);
+    variants[vname] = {
+      percentageSplit: `${splits[i].toFixed(4)}`,
+      pages: [page],
+      blocks: [],
+      label: `Challenger ${i + 1}`,
+    };
+  });
+  inferEmptyPercentageSplits(Object.values(variants));
+
+  const resolvedAudiences = await getResolvedAudiences(
+    audiences,
     pluginOptions,
-    context,
   );
-  experimentConfig.run = (
+
+  const startDate = metadata.startDate ? new Date(metadata.startDate) : null;
+  const endDate = metadata.endDate ? new Date(metadata.endDate) : null;
+
+  const config = {
+    id,
+    label: metadata.name || `Experiment ${metadata.value || metadata.experiment}`,
+    status: metadata.status || 'active',
+    audiences,
+    endDate,
+    resolvedAudiences,
+    startDate,
+    variants,
+    variantNames,
+  };
+
+  config.run = (
     // experiment is active or forced
-    (['active', 'on', 'true'].includes(context.toClassName(experimentConfig.status)) || forcedExperiment)
+    (['active', 'on', 'true'].includes(toClassName(config.status)) || overrides.value)
     // experiment has resolved audiences if configured
-    && (!experimentConfig.resolvedAudiences || experimentConfig.resolvedAudiences.length)
+    && (!resolvedAudiences || resolvedAudiences.length)
     // forced audience resolves if defined
-    && (!forcedAudience || experimentConfig.audiences.includes(forcedAudience))
-    && (!experimentConfig.startDate || new Date(experimentConfig.startDate) <= Date.now())
-    && (!experimentConfig.endDate || new Date(experimentConfig.endDate) > Date.now())
+    && (!overrides.audience || audiences.includes(overrides.audience))
+    && (!startDate || startDate <= Date.now())
+    && (!endDate || endDate > Date.now())
   );
 
-  window.hlx = window.hlx || {};
-  window.hlx.experiment = experimentConfig;
+  if (!config.run) {
+    return config;
+  }
 
-  // eslint-disable-next-line no-console
-  console.debug('run', experimentConfig.run, experimentConfig.audiences);
-  if (forcedVariant && experimentConfig.variantNames.includes(forcedVariant)) {
-    experimentConfig.selectedVariant = forcedVariant;
+  const [, forcedVariant] = (Array.isArray(overrides.value)
+    ? overrides.value
+    : stringToArray(overrides.value))
+    .map((value) => value?.split('/'))
+    .find(([experiment]) => toClassName(experiment) === config.id) || [];
+  if (variantNames.includes(toClassName(forcedVariant))) {
+    config.selectedVariant = toClassName(forcedVariant);
+  } else if (overrides.variant && variantNames.includes(overrides.variant)) {
+    config.selectedVariant = toClassName(overrides.variant);
   } else {
     // eslint-disable-next-line import/extensions
     const { ued } = await import('./ued.js');
-    const decision = ued.evaluateDecisionPolicy(getDecisionPolicy(experimentConfig), {});
-    experimentConfig.selectedVariant = decision.items[0].id;
+    const decision = ued.evaluateDecisionPolicy(toDecisionPolicy(config), {});
+    config.selectedVariant = decision.items[0].id;
   }
-  return experimentConfig;
+
+  return config;
+}
+/**
+ * Parses the campaign manifest.
+ */
+function parseExperimentManifest(entries) {
+  return Object.values(Object.groupBy(entries, ({ experiment }) => experiment))
+    .map(aggregateEntries('experiment', /(splits?|urls?|variants?)/));
 }
 
-export async function runExperiment(document, options, context) {
-  if (isBot()) {
-    return false;
-  }
-
-  const pluginOptions = { ...DEFAULT_OPTIONS, ...(options || {}) };
-  const experiment = context.getMetadata(pluginOptions.experimentsMetaTag);
-  if (!experiment) {
-    return false;
-  }
-  const variants = context.getMetadata('instant-experiment')
-    || context.getMetadata(`${pluginOptions.experimentsMetaTag}-variants`);
-  let experimentConfig;
-  try {
-    experimentConfig = await getConfig(experiment, variants, pluginOptions, context);
-  } catch (err) {
-    // eslint-disable-next-line no-console
-    console.error('Invalid experiment config.', err);
-  }
-  if (!experimentConfig || !isValidExperimentationConfig(experimentConfig)) {
-    // eslint-disable-next-line no-console
-    console.warn('Invalid experiment config. Please review your metadata, sheet and parser.');
-    return false;
-  }
-
-  const usp = new URLSearchParams(window.location.search);
-  const forcedVariant = usp.has(pluginOptions.experimentsQueryParameter)
-    ? usp.get(pluginOptions.experimentsQueryParameter).split('/')[1]
+function getUrlFromExperimentConfig(config) {
+  return config.run
+    ? config.variants[config.selectedVariant].pages[0]
     : null;
-  if (!experimentConfig.run && !forcedVariant) {
-    // eslint-disable-next-line no-console
-    console.warn('Experiment will not run. It is either not active or its configured audiences are not resolved.');
-    return false;
-  }
-  // eslint-disable-next-line no-console
-  console.debug(`running experiment (${window.hlx.experiment.id}) -> ${window.hlx.experiment.selectedVariant}`);
-
-  if (experimentConfig.selectedVariant === experimentConfig.variantNames[0]) {
-    document.body.classList.add(`experiment-${context.toClassName(experimentConfig.id)}`);
-    document.body.classList.add(`variant-${context.toClassName(experimentConfig.selectedVariant)}`);
-    context.sampleRUM('experiment', {
-      source: experimentConfig.id,
-      target: experimentConfig.selectedVariant,
-    });
-    return false;
-  }
-
-  const { pages } = experimentConfig.variants[experimentConfig.selectedVariant];
-  if (!pages.length) {
-    return false;
-  }
-
-  const currentPath = window.location.pathname;
-  const control = experimentConfig.variants[experimentConfig.variantNames[0]];
-  const index = control.pages.indexOf(currentPath);
-  if (index < 0) {
-    return false;
-  }
-
-  // Fullpage content experiment
-  document.body.classList.add(`experiment-${context.toClassName(experimentConfig.id)}`);
-  let result;
-  if (pages[index] !== currentPath) {
-    result = await replaceInner(pages[index], document.querySelector('main'));
-  } else {
-    result = currentPath;
-  }
-  experimentConfig.servedExperience = result || currentPath;
-  if (!result) {
-    // eslint-disable-next-line no-console
-    console.debug(`failed to serve variant ${window.hlx.experiment.selectedVariant}. Falling back to ${experimentConfig.variantNames[0]}.`);
-  }
-  document.body.classList.add(`variant-${context.toClassName(result ? experimentConfig.selectedVariant : experimentConfig.variantNames[0])}`);
-  context.sampleRUM('experiment', {
-    source: experimentConfig.id,
-    target: result ? experimentConfig.selectedVariant : experimentConfig.variantNames[0],
-  });
-  return result;
 }
 
-export async function runCampaign(document, options, context) {
-  if (isBot()) {
-    return false;
-  }
-
-  const pluginOptions = { ...DEFAULT_OPTIONS, ...options };
-  const usp = new URLSearchParams(window.location.search);
-  const campaign = (usp.has(pluginOptions.campaignsQueryParameter)
-    ? context.toClassName(usp.get(pluginOptions.campaignsQueryParameter))
-    : null)
-    || (usp.has('utm_campaign') ? context.toClassName(usp.get('utm_campaign')) : null);
-  if (!campaign) {
-    return false;
-  }
-
-  let audiences = context.getMetadata(`${pluginOptions.campaignsMetaTagPrefix}-audience`);
-  let resolvedAudiences = null;
-  if (audiences) {
-    audiences = audiences.split(',').map(context.toClassName);
-    resolvedAudiences = await getResolvedAudiences(audiences, pluginOptions, context);
-    if (!!resolvedAudiences && !resolvedAudiences.length) {
-      return false;
-    }
-  }
-
-  const allowedCampaigns = context.getAllMetadata(pluginOptions.campaignsMetaTagPrefix);
-  if (!Object.keys(allowedCampaigns).includes(campaign)) {
-    return false;
-  }
-
-  const urlString = allowedCampaigns[campaign];
-  if (!urlString) {
-    return false;
-  }
-
-  window.hlx.campaign = { selectedCampaign: campaign };
-  if (resolvedAudiences) {
-    window.hlx.campaign.resolvedAudiences = window.hlx.campaign;
-  }
-
-  try {
-    const url = new URL(urlString);
-    const result = await replaceInner(url.pathname, document.querySelector('main'));
-    window.hlx.campaign.servedExperience = result || window.location.pathname;
-    if (!result) {
-      // eslint-disable-next-line no-console
-      console.debug(`failed to serve campaign ${campaign}. Falling back to default content.`);
-    }
-    document.body.classList.add(`campaign-${campaign}`);
-    context.sampleRUM('campaign', {
-      source: window.location.href,
-      target: result ? campaign : 'default',
-    });
-    return result;
-  } catch (err) {
-    // eslint-disable-next-line no-console
-    console.error(err);
-    return false;
-  }
-}
-
-export async function serveAudience(document, options, context) {
-  if (isBot()) {
-    return false;
-  }
-
-  const pluginOptions = { ...DEFAULT_OPTIONS, ...(options || {}) };
-  const configuredAudiences = context.getAllMetadata(pluginOptions.audiencesMetaTagPrefix);
-  if (!Object.keys(configuredAudiences).length) {
-    return false;
-  }
-
-  const audiences = await getResolvedAudiences(
-    Object.keys(configuredAudiences).map(context.toClassName),
+async function runExperiment(document, pluginOptions) {
+  return applyAllModifications(
+    pluginOptions.experimentsMetaTagPrefix,
+    pluginOptions.experimentsQueryParameter,
     pluginOptions,
-    context,
+    getExperimentConfig,
+    parseExperimentManifest,
+    getUrlFromExperimentConfig,
+    (el, config, result) => {
+      const { id, selectedVariant, variantNames } = config;
+      el.classList.add(`experiment-${toClassName(id)}`);
+      el.classList.add(`variant-${toClassName(result ? selectedVariant : variantNames[0])}`);
+      if (pluginOptions.trackingFunction) {
+        pluginOptions.trackingFunction('experiment', {
+          source: id,
+          target: result ? selectedVariant : variantNames[0],
+        });
+      }
+      pluginOptions.decorationCallback(el);
+    },
   );
-  if (!audiences || !audiences.length) {
-    return false;
-  }
-
-  const usp = new URLSearchParams(window.location.search);
-  const forcedAudience = usp.has(pluginOptions.audiencesQueryParameter)
-    ? context.toClassName(usp.get(pluginOptions.audiencesQueryParameter))
-    : null;
-
-  const selectedAudience = forcedAudience || audiences[0];
-  const urlString = configuredAudiences[selectedAudience];
-  if (!urlString) {
-    return false;
-  }
-
-  window.hlx.audience = { selectedAudience };
-
-  try {
-    const url = new URL(urlString);
-    const result = await replaceInner(url.pathname, document.querySelector('main'));
-    window.hlx.audience.servedExperience = result || window.location.pathname;
-    if (!result) {
-      // eslint-disable-next-line no-console
-      console.debug(`failed to serve audience ${selectedAudience}. Falling back to default content.`);
-    }
-    document.body.classList.add(audiences.map((audience) => `audience-${audience}`));
-    context.sampleRUM('audiences', {
-      source: window.location.href,
-      target: result ? forcedAudience || audiences.join(',') : 'default',
-    });
-    return result;
-  } catch (err) {
-    // eslint-disable-next-line no-console
-    console.error(err);
-    return false;
-  }
 }
 
-window.hlx.patchBlockConfig?.push((config) => {
-  const { experiment } = window.hlx;
-
-  // No experiment is running
-  if (!experiment || !experiment.run) {
-    return config;
+/**
+ * Parses the campaign configuration from the metadata
+ */
+async function getCampaignConfig(pluginOptions, metadata, overrides) {
+  if (!Object.keys(metadata).length) {
+    return null;
   }
 
-  // The current experiment does not modify the block
-  if (experiment.selectedVariant === experiment.variantNames[0]
-    || !experiment.variants[experiment.variantNames[0]].blocks
-    || !experiment.variants[experiment.variantNames[0]].blocks.includes(config.blockName)) {
-    return config;
-  }
-
-  // The current experiment does not modify the block code
-  const variant = experiment.variants[experiment.selectedVariant];
-  if (!variant.blocks.length) {
-    return config;
-  }
-
-  let index = experiment.variants[experiment.variantNames[0]].blocks.indexOf('');
-  if (index < 0) {
-    index = experiment.variants[experiment.variantNames[0]].blocks.indexOf(config.blockName);
-  }
-  if (index < 0) {
-    index = experiment.variants[experiment.variantNames[0]].blocks.indexOf(`/blocks/${config.blockName}`);
-  }
-  if (index < 0) {
-    return config;
-  }
-
-  let origin = '';
-  let path;
-  if (/^https?:\/\//.test(variant.blocks[index])) {
-    const url = new URL(variant.blocks[index]);
-    // Experimenting from a different branch
-    if (url.origin !== window.location.origin) {
-      origin = url.origin;
+  // Check UTM parameters
+  let campaign = overrides.value;
+  if (!campaign) {
+    const usp = new URLSearchParams(window.location.search);
+    if (usp.has('utm_campaign')) {
+      campaign = toClassName(usp.get('utm_campaign'));
     }
-    // Experimenting from a block path
-    if (url.pathname !== '/') {
-      path = url.pathname;
-    } else {
-      path = `/blocks/${config.blockName}`;
-    }
-  } else { // Experimenting from a different branch on the same branch
-    path = `/blocks/${variant.blocks[index]}`;
-  }
-  if (!origin && !path) {
-    return config;
+  } else {
+    campaign = toClassName(campaign);
   }
 
-  const { codeBasePath } = window.hlx;
+  if (metadata.audience) {
+    metadata.audiences = metadata.audience;
+  }
+
+  const audiences = stringToArray(metadata.audiences).map(toClassName);
+  const resolvedAudiences = await getResolvedAudiences(
+    audiences,
+    pluginOptions,
+  );
+  if (resolvedAudiences && !resolvedAudiences.length) {
+    return null;
+  }
+
+  const configuredCampaigns = Object.fromEntries(Object.entries(metadata.campaigns || metadata)
+    .filter(([key]) => !['audience', 'audiences'].includes(key)));
+
   return {
-    ...config,
-    cssPath: `${origin}${codeBasePath}${path}/${config.blockName}.css`,
-    jsPath: `${origin}${codeBasePath}${path}/${config.blockName}.js`,
+    audiences,
+    configuredCampaigns,
+    resolvedAudiences,
+    selectedCampaign: campaign && (metadata.campaigns || metadata)[campaign]
+      ? campaign
+      : null,
   };
-});
+}
+
+/**
+ * Parses the campaign manifest.
+ */
+function parseCampaignManifest(entries) {
+  return Object.values(Object.groupBy(entries, ({ selector }) => selector))
+    .map(aggregateEntries('campaign', /(campaigns?|urls?)/))
+    .map((e) => {
+      const campaigns = (e.campaign || e.campaigns);
+      delete e.campaign;
+      e.campaigns = {};
+      campaigns.forEach((a, i) => {
+        e.campaigns[toClassName(a)] = e.url[i] || e.urls[i];
+      });
+      delete e.url;
+      delete e.urls;
+      return e;
+    });
+}
+
+function getUrlFromCampaignConfig(config) {
+  return config.selectedCampaign
+    ? config.configuredCampaigns[config.selectedCampaign]
+    : null;
+}
+
+async function runCampaign(document, pluginOptions) {
+  return applyAllModifications(
+    pluginOptions.campaignsMetaTagPrefix,
+    pluginOptions.campaignsQueryParameter,
+    pluginOptions,
+    getCampaignConfig,
+    parseCampaignManifest,
+    getUrlFromCampaignConfig,
+    (el, config, result) => {
+      const { selectedCampaign = 'default' } = config;
+      el.classList.add(`campaign-${result ? toClassName(selectedCampaign) : 'default'}`);
+      if (pluginOptions.trackingFunction) {
+        pluginOptions.trackingFunction('campaign', {
+          source: el.className,
+          target: result ? selectedCampaign : 'default',
+        });
+      }
+      pluginOptions.decorationCallback(el);
+    },
+  );
+}
+
+/**
+ * Parses the audience configuration from the metadata
+ */
+async function getAudienceConfig(pluginOptions, metadata, overrides) {
+  if (!Object.keys(metadata).length) {
+    return null;
+  }
+
+  const configuredAudiencesName = Object.keys(metadata.audiences || metadata).map(toClassName);
+  const resolvedAudiences = await getResolvedAudiences(
+    configuredAudiencesName,
+    pluginOptions,
+  );
+  if (resolvedAudiences && !resolvedAudiences.length) {
+    return false;
+  }
+
+  const selectedAudience = overrides.audience || resolvedAudiences[0];
+
+  return {
+    configuredAudiences: metadata.audiences || metadata,
+    resolvedAudiences,
+    selectedAudience,
+  };
+}
+
+/**
+ * Parses the audience manifest.
+ */
+function parseAudienceManifest(entries) {
+  return Object.values(Object.groupBy(entries, ({ selector }) => selector))
+    .map(aggregateEntries('audience', /(audiences?|urls?)/))
+    .map((e) => {
+      const audiences = (e.audience || e.audiences);
+      delete e.audience;
+      e.audiences = {};
+      audiences.forEach((a, i) => {
+        e.audiences[toClassName(a)] = e.url[i] || e.urls[i];
+      });
+      delete e.url;
+      delete e.urls;
+      return e;
+    });
+}
+
+function getUrlFromAudienceConfig(config) {
+  return config.selectedAudience
+    ? config.configuredAudiences[config.selectedAudience]
+    : null;
+}
+
+async function serveAudience(document, pluginOptions) {
+  return applyAllModifications(
+    pluginOptions.audiencesMetaTagPrefix,
+    pluginOptions.audiencesQueryParameter,
+    pluginOptions,
+    getAudienceConfig,
+    parseAudienceManifest,
+    getUrlFromAudienceConfig,
+    (el, config, result) => {
+      const { selectedAudience = 'default' } = config;
+      el.classList.add(`audience-${result ? toClassName(selectedAudience) : 'default'}`);
+      if (pluginOptions.trackingFunction) {
+        pluginOptions.trackingFunction('audience', {
+          source: el.className,
+          target: result ? selectedAudience : 'default',
+        });
+      }
+      pluginOptions.decorationCallback(el);
+    },
+  );
+}
 
 let isAdjusted = false;
-function adjustedRumSamplingRate(checkpoint, options, context) {
-  const pluginOptions = { ...DEFAULT_OPTIONS, ...(options || {}) };
+function adjustRumSampligRateInternal(checkpoint, options) {
   return (data) => {
     if (!window.hlx.rum.isSelected && !isAdjusted) {
       isAdjusted = true;
@@ -668,60 +832,70 @@ function adjustedRumSamplingRate(checkpoint, options, context) {
         window.hlx.rum.weight,
         // … but limit it to the 10% sampling at max to avoid losing anonymization
         // and reduce burden on the backend
-        Math.max(pluginOptions.rumSamplingRate, MAX_SAMPLING_RATE),
+        Math.max(options.rumSamplingRate, MAX_SAMPLING_RATE),
       );
       window.hlx.rum.isSelected = (window.hlx.rum.random * window.hlx.rum.weight < 1);
       if (window.hlx.rum.isSelected) {
-        context.sampleRUM(checkpoint, data);
+        window.hlx.rum.sampleRUM(checkpoint, data);
       }
     }
     return true;
   };
 }
 
-function adjustRumSampligRate(document, options, context) {
-  const checkpoints = ['audiences', 'campaign', 'experiment'];
-  if (context.sampleRUM.always) { // RUM v1.x
+function adjustRumSampligRate(document, options) {
+  const checkpoints = ['experiment'];
+  if (options.trackingFunction?.always) { // RUM v1.x
     checkpoints.forEach((ck) => {
-      context.sampleRUM.always.on(ck, adjustedRumSamplingRate(ck, options, context));
+      options.trackingFunction?.always.on(ck, adjustRumSampligRateInternal(ck, options));
     });
   } else { // RUM 2.x
     document.addEventListener('rum', (event) => {
-      if (event.detail
-        && event.detail.checkpoint
-        && checkpoints.includes(event.detail.checkpoint)) {
-        adjustedRumSamplingRate(event.detail.checkpoint, options, context);
+      if (event.detail?.checkpoint && checkpoints.includes(event.detail.checkpoint)) {
+        adjustRumSampligRateInternal(event.detail.checkpoint, options);
       }
     });
   }
 }
 
-export async function loadEager(document, options, context) {
-  adjustRumSampligRate(document, options, context);
-  let res = await runCampaign(document, options, context);
-  if (!res) {
-    res = await runExperiment(document, options, context);
-  }
-  if (!res) {
-    res = await serveAudience(document, options, context);
-  }
+export async function loadEager(document, options = {}) {
+  const pluginOptions = { ...DEFAULT_OPTIONS, ...options };
+  setDebugMode(pluginOptions);
+
+  adjustRumSampligRate(document, pluginOptions);
+
+  const ns = window.aem || window.hlx || {};
+  ns.audiences = await serveAudience(document, pluginOptions);
+  ns.experiments = await runExperiment(document, pluginOptions);
+  ns.campaigns = await runCampaign(document, pluginOptions);
+
+  // Backward compatibility
+  ns.experiment = ns.experiments?.page?.config
+    ? {
+      ...ns.experiments.page.config,
+      ...(ns.experiments.page.servedExperience
+        ? { servedExperience: ns.experiments.page.servedExperience }
+        : {}),
+    }
+    : null;
+  ns.audience = ns.audiences?.page?.config
+    ? {
+      audiences: ns.audiences.page.config.configuredAudiences,
+      selectedAudience: ns.audiences.page.config.serveAudience,
+      ...(ns.audiences.page.servedExperience
+        ? { servedExperience: ns.audiences.page.servedExperience }
+        : {}),
+    }
+    : null;
 }
 
-export async function loadLazy(document, options, context) {
-  const pluginOptions = {
-    ...DEFAULT_OPTIONS,
-    ...(options || {}),
-  };
+export async function loadLazy(document, options = {}) {
+  const pluginOptions = { ...DEFAULT_OPTIONS, ...options };
   // do not show the experimentation pill on prod domains
-  if (window.location.hostname.endsWith('.live')
-    || (typeof options.isProd === 'function' && options.isProd())
-    || (options.prodHost
-      && (options.prodHost === window.location.host
-        || options.prodHost === window.location.hostname
-        || options.prodHost === window.location.origin))) {
+  if (!isDebugEnabled) {
     return;
   }
   // eslint-disable-next-line import/no-cycle
   const preview = await import('./preview.js');
-  preview.default(document, pluginOptions, { ...context, getResolvedAudiences });
+  preview.default(document, pluginOptions);
 }
