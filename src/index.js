@@ -11,7 +11,15 @@
  */
 const MAX_SAMPLING_RATE = 10; // At a maximum we sample 1 in 10 requests
 
+let isDebugEnabled = false;
+function debug(...args) {
+  if (isDebugEnabled) {
+    console.debug.call(this, '[experimentation]', ...args);
+  }
+}
+
 export const DEFAULT_OPTIONS = {
+  decorateExperience: () => {},
   trackingFunction: window.sampleRUM,
 
   // Generic properties
@@ -280,9 +288,9 @@ function toDecisionPolicy(config) {
 }
 
 async function applyExperienceModifications(
-  pluginOptions,
   ns,
   paramNS,
+  pluginOptions,
   metadataToConfig,
   getExperienceUrl,
   cb,
@@ -296,8 +304,10 @@ async function applyExperienceModifications(
   if (page.config) {
     const url = await getExperienceUrl(page.config);
     const result = await replaceInner(url, document.querySelector('main'));
+    pluginOptions.decorateExperience(document.querySelector('main'));
     cb(document.querySelector('main'), page.config, result);
     page.servedExperience = result ? url : window.location.pathname;
+    debug('page', ns, page);
   }
 
   // Section-level modifications
@@ -311,7 +321,9 @@ async function applyExperienceModifications(
       const url = await getExperienceUrl(section.config);
       // eslint-disable-next-line no-shadow
       const result = replaceInner(url, sm.parentElement);
+      pluginOptions.decorateExperience(sm.parentElement);
       cb(sm.parentElement, section.config, result);
+      debug('section', ns, sm.parentElement);
       return result || window.location.pathname;
     }
     return null;
@@ -424,23 +436,20 @@ async function getExperimentConfig(pluginOptions, metadata, overrides) {
   return config;
 }
 
-function getExperienceUrlFromExperimentConfig() {
-
+function getUrlFromExperimentConfig(config) {
+  return config.run
+    ? config.variants[config.selectedVariant].pages[0]
+    : null;
 }
 
 async function runExperiment(document, options) {
   const pluginOptions = { ...DEFAULT_OPTIONS, ...(options || {}) };
   return applyExperienceModifications(
-    pluginOptions,
     pluginOptions.experimentsMetaTag,
     pluginOptions.experimentsQueryParameter,
+    pluginOptions,
     getExperimentConfig,
-    async (config) => {
-      if (!config.run) {
-        return null;
-      }
-      return config.variants[config.selectedVariant].pages[0];
-    },
+    getUrlFromExperimentConfig,
     (el, config, result) => {
       const { id, selectedVariant, variantNames } = config;
       el.classList.add(`experiment-${toClassName(id)}`);
@@ -458,9 +467,9 @@ async function runExperiment(document, options) {
 async function runCampaign(document, options) {
   const pluginOptions = { ...DEFAULT_OPTIONS, ...(options || {}) };
   return applyExperienceModifications(
-    pluginOptions,
     pluginOptions.campaignsMetaTagPrefix,
     pluginOptions.campaignsQueryParameter,
+    pluginOptions,
     () => {},
     async (config) => { console.log('campaign', config); return null; },
     (el, config, res) => {
@@ -472,23 +481,34 @@ async function runCampaign(document, options) {
 async function serveAudience(document, options) {
   const pluginOptions = { ...DEFAULT_OPTIONS, ...(options || {}) };
   return applyExperienceModifications(
-    pluginOptions,
     pluginOptions.audiencesMetaTagPrefix,
     pluginOptions.audiencesQueryParameter,
+    pluginOptions,
     () => {},
     async (config) => { console.log('audience', config); return null; },
     (el, config, res) => {
       console.log(el, res);
+      const { selectedAudience = 'default' } = config;
+      el.classList.add(`audience-${toClassName(selectedAudience)}`);
+      if (pluginOptions.trackingFunction) {
+        pluginOptions.trackingFunction('audience', {
+          source: window.location.href,
+          target: selectedAudience,
+        });
+      }
     },
   );
 }
 
 export async function loadEager(document, options) {
+  const { host, hostname, origin } = window.location;
+  isDebugEnabled = !window.location.hostname.endsWith('.live')
+    && (options.isProd !== 'function' || !options.isProd())
+    && (!options.prodHost || ![host, hostname, origin].includes(options.prodHost));
   window.hlx ||= {};
   window.hlx.expriments = await runExperiment(document, options);
-  window.hlx.expriment = window.hlx.expriments;
-  window.hlx.campaign = await runCampaign(document, options);
-  window.hlx.audience = await serveAudience(document, options);
+  window.hlx.campaigns = await runCampaign(document, options);
+  window.hlx.audiences = await serveAudience(document, options);
   console.log(window.hlx);
 }
 
