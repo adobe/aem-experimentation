@@ -287,7 +287,30 @@ function toDecisionPolicy(config) {
   return decisionPolicy;
 }
 
-async function applyExperienceModifications(
+function getModificationsHandler(
+  overrides,
+  metadataToConfig,
+  getExperienceUrl,
+  pluginOptions,
+  cb,
+) {
+  return async (el, metadata) => {
+    const config = await metadataToConfig(pluginOptions, metadata, overrides);
+    if (!config) {
+      return null;
+    }
+    const ns = { config };
+    const url = await getExperienceUrl(ns.config);
+    const result = await replaceInner(url, el);
+    cb(el, ns.config, result);
+    if (result) {
+      ns.servedExperience = result;
+    }
+    return ns;
+  };
+}
+
+async function applyAllModifications(
   ns,
   paramNS,
   pluginOptions,
@@ -295,49 +318,41 @@ async function applyExperienceModifications(
   getExperienceUrl,
   cb,
 ) {
-  const queryParamsConfig = getAllQueryParameters(paramNS);
+  const modificationsHandler = getModificationsHandler(
+    getAllQueryParameters(paramNS),
+    metadataToConfig,
+    getExperienceUrl,
+    pluginOptions,
+    cb,
+  );
 
   // Full-page modifications
-  const page = {};
-  const pageMeta = getAllMetadata(ns);
-  page.config = await metadataToConfig(pluginOptions, pageMeta, queryParamsConfig);
-  if (page.config) {
-    const url = await getExperienceUrl(page.config);
-    const result = await replaceInner(url, document.querySelector('main'));
-    pluginOptions.decorateExperience(document.querySelector('main'));
-    cb(document.querySelector('main'), page.config, result);
-    page.servedExperience = result ? url : window.location.pathname;
-    debug('page', ns, page);
+  const pageNS = await modificationsHandler(
+    document.querySelector('main'),
+    getAllMetadata(ns),
+  );
+  if (pageNS) {
+    debug('page', ns, pageNS);
   }
 
   // Section-level modifications
-  const sections = [];
-  await Promise.all([...document.querySelectorAll('.section-metadata')].map(async (sm) => {
-    const sectionMeta = getAllSectionMeta(sm, ns);
-    const section = {};
-    section.config = await metadataToConfig(pluginOptions, sectionMeta, queryParamsConfig);
-    if (section.config) {
-      sections.push(section);
-      const url = await getExperienceUrl(section.config);
-      // eslint-disable-next-line no-shadow
-      const result = replaceInner(url, sm.parentElement);
-      pluginOptions.decorateExperience(sm.parentElement);
-      cb(sm.parentElement, section.config, result);
-      debug('section', ns, sm.parentElement);
-      return result || window.location.pathname;
-    }
-    return null;
-  }))
-    .then((urls) => urls.forEach((u, i) => {
-      if (u) {
-        sections[i].servedExperience = u;
+  const sectionsNS = [];
+  await Promise.all([...document.querySelectorAll('.section-metadata')]
+    .map(async (sm) => {
+      const sectionNS = await modificationsHandler(
+        sm.parentElement,
+        getAllSectionMeta(sm, ns),
+      );
+      if (sectionNS) {
+        debug('section', ns, sectionNS);
+        sectionsNS.push(sectionNS);
       }
     }));
 
   // TODO: Fragment-level modifications via manifest
-  const fragments = [];
+  const fragmentsNS = [];
 
-  return { page, sections, fragments };
+  return { page: pageNS, sections: sectionsNS, fragments: fragmentsNS };
 }
 
 async function getExperimentConfig(pluginOptions, metadata, overrides) {
@@ -444,7 +459,7 @@ function getUrlFromExperimentConfig(config) {
 }
 
 async function runExperiment(document, pluginOptions) {
-  return applyExperienceModifications(
+  return applyAllModifications(
     pluginOptions.experimentsMetaTag,
     pluginOptions.experimentsQueryParameter,
     pluginOptions,
@@ -460,13 +475,14 @@ async function runExperiment(document, pluginOptions) {
           target: result ? selectedVariant : variantNames[0],
         });
       }
+      pluginOptions.decorateExperience(el);
     },
   );
 }
 
 async function runCampaign(document, options) {
   const pluginOptions = { ...DEFAULT_OPTIONS, ...(options || {}) };
-  return applyExperienceModifications(
+  return applyAllModifications(
     pluginOptions.campaignsMetaTagPrefix,
     pluginOptions.campaignsQueryParameter,
     pluginOptions,
@@ -480,7 +496,7 @@ async function runCampaign(document, options) {
 
 async function serveAudience(document, options) {
   const pluginOptions = { ...DEFAULT_OPTIONS, ...(options || {}) };
-  return applyExperienceModifications(
+  return applyAllModifications(
     pluginOptions.audiencesMetaTagPrefix,
     pluginOptions.audiencesQueryParameter,
     pluginOptions,
@@ -506,11 +522,11 @@ export async function loadEager(document, options = {}) {
   isDebugEnabled = !window.location.hostname.endsWith('.live')
     && (pluginOptions.isProd !== 'function' || !pluginOptions.isProd())
     && (!pluginOptions.prodHost || ![host, hostname, origin].includes(pluginOptions.prodHost));
-  window.hlx ||= {};
-  window.hlx.experiments = await runExperiment(document, pluginOptions);
-  window.hlx.campaigns = await runCampaign(document, pluginOptions);
-  window.hlx.audiences = await serveAudience(document, pluginOptions);
-  debug(window.hlx);
+  const ns = window.aem || window.hlx || {};
+  ns.experiments = await runExperiment(document, pluginOptions);
+  ns.campaigns = await runCampaign(document, pluginOptions);
+  ns.audiences = await serveAudience(document, pluginOptions);
+  debug(ns);
 }
 
 export async function loadLazy(document, options = {}) {
