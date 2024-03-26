@@ -11,7 +11,16 @@
  */
 const MAX_SAMPLING_RATE = 10; // At a maximum we sample 1 in 10 requests
 
-let isDebugEnabled = false;
+let isDebugEnabled;
+export function setDebugMode(pluginOptions) {
+  const { host, hostname, origin } = window.location;
+  const { isProd, prodHost } = pluginOptions;
+  isDebugEnabled = !(window.location.hostname.endsWith('.live')
+    || (typeof isProd === 'function' && isProd())
+    || (prodHost && [host, hostname, origin].includes(prodHost)));
+  return isDebugEnabled;
+}
+
 export function debug(...args) {
   if (isDebugEnabled) {
     console.debug.call(this, '[experimentation]', ...args);
@@ -518,26 +527,24 @@ async function serveAudience(document, options) {
 
 export async function loadEager(document, options = {}) {
   const pluginOptions = { ...DEFAULT_OPTIONS, ...options };
-  const { host, hostname, origin } = window.location;
-  isDebugEnabled = !window.location.hostname.endsWith('.live')
-    && (pluginOptions.isProd !== 'function' || !pluginOptions.isProd())
-    && (!pluginOptions.prodHost || ![host, hostname, origin].includes(pluginOptions.prodHost));
+  setDebugMode(pluginOptions);
+
   const ns = window.aem || window.hlx || {};
   ns.experiments = await runExperiment(document, pluginOptions);
   ns.campaigns = await runCampaign(document, pluginOptions);
   ns.audiences = await serveAudience(document, pluginOptions);
-  debug(ns);
+
+  // Backward compatibility
+  ns.experiment = {
+    ...ns.experiments?.page?.config,
+    servedExperience: ns.experiments?.page?.servedExperience,
+  };
 }
 
 export async function loadLazy(document, options = {}) {
   const pluginOptions = { ...DEFAULT_OPTIONS, ...options };
   // do not show the experimentation pill on prod domains
-  if (window.location.hostname.endsWith('.live')
-    || (typeof options.isProd === 'function' && options.isProd())
-    || (options.prodHost
-        && (options.prodHost === window.location.host
-          || options.prodHost === window.location.hostname
-          || options.prodHost === window.location.origin))) {
+  if (!isDebugEnabled) {
     return;
   }
   // eslint-disable-next-line import/no-cycle
