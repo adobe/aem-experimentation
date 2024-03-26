@@ -484,7 +484,7 @@ async function decorateAudiencesPill(overlay, options) {
   }
 
   const pill = createPopupButton(
-    'Audiences',
+    `Audience: ${config.selectedAudience || 'default'}`,
     {
       label: 'Audiences for this page:',
     },
