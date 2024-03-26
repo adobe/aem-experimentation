@@ -311,7 +311,7 @@ function getModificationsHandler(
     const ns = { config };
     const url = await getExperienceUrl(ns.config);
     const result = await replaceInner(url, el);
-    cb(el, ns.config, result);
+    cb(el.tagName === 'MAIN' ? document.body : el, ns.config, result);
     if (result) {
       ns.servedExperience = result;
     }
@@ -503,22 +503,47 @@ async function runCampaign(document, options) {
   );
 }
 
+async function getAudienceConfig(pluginOptions, metadata, overrides) {
+  if (!Object.keys(metadata).length) {
+    return null;
+  }
+
+  const configuredAudiencesName = Object.keys(metadata).map(toClassName);
+  const audiences = await getResolvedAudiences(
+    configuredAudiencesName,
+    pluginOptions,
+  );
+  if (!audiences?.length) {
+    return false;
+  }
+
+  const selectedAudience = overrides.audience || audiences[0];
+
+  return { configuredAudiences: metadata, selectedAudience };
+  // configuredAudiences[selectedAudience]
+}
+
+function getUrlFromAudienceConfig(config) {
+  return config.selectedAudience
+    ? config.configuredAudiences[config.selectedAudience]
+    : null;
+}
+
 async function serveAudience(document, options) {
   const pluginOptions = { ...DEFAULT_OPTIONS, ...(options || {}) };
   return applyAllModifications(
     pluginOptions.audiencesMetaTagPrefix,
     pluginOptions.audiencesQueryParameter,
     pluginOptions,
-    () => {},
-    async (config) => { console.log('audience', config); return null; },
-    (el, config, res) => {
-      console.log(el, res);
+    getAudienceConfig,
+    getUrlFromAudienceConfig,
+    (el, config, result) => {
       const { selectedAudience = 'default' } = config;
       el.classList.add(`audience-${toClassName(selectedAudience)}`);
       if (pluginOptions.trackingFunction) {
         pluginOptions.trackingFunction('audience', {
-          source: window.location.href,
-          target: selectedAudience,
+          source: el.className,
+          target: result ? selectedAudience : 'default',
         });
       }
     },

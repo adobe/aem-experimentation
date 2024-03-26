@@ -471,29 +471,32 @@ function createAudience(audience, isSelected, options) {
  * @return {Object} returns a badge or empty string
  */
 async function decorateAudiencesPill(overlay, options) {
-  const audiences = getAllMetadata(options.audiencesMetaTagPrefix);
-  if (!Object.keys(audiences).length || !Object.keys(options.audiences).length) {
+  const config = window.hlx?.audiences?.page?.config || {
+    configuredAudiences: getAllMetadata(options.audiencesMetaTagPrefix),
+    selectedAudience: window.hlx?.audience?.selectedAudience,
+  };
+  if (!config) {
+    return;
+  }
+  const configuredAudienceNames = Object.keys(config.configuredAudiences);
+  if (!Object.keys(config.configuredAudiences).length || !Object.keys(options.audiences).length) {
     return;
   }
 
-  const resolvedAudiences = await getResolvedAudiences(
-    Object.keys(audiences),
-    options,
-  );
   const pill = createPopupButton(
     'Audiences',
     {
       label: 'Audiences for this page:',
     },
     [
-      createAudience('default', !resolvedAudiences.length || resolvedAudiences[0] === 'default', options),
-      ...Object.keys(audiences)
+      createAudience('default', !config.selectedAudience || config.selectedAudience === 'default', options),
+      ...configuredAudienceNames
         .filter((a) => a !== 'audience')
-        .map((a) => createAudience(a, resolvedAudiences && resolvedAudiences[0] === a, options)),
+        .map((a) => createAudience(a, config.selectedAudience === a, options)),
     ],
   );
 
-  if (resolvedAudiences.length) {
+  if (config.selectedAudience) {
     pill.classList.add('is-active');
   }
   overlay.append(pill);
