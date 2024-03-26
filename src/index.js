@@ -535,10 +535,14 @@ export async function loadEager(document, options = {}) {
   ns.audiences = await serveAudience(document, pluginOptions);
 
   // Backward compatibility
-  ns.experiment = {
-    ...ns.experiments?.page?.config,
-    servedExperience: ns.experiments?.page?.servedExperience,
-  };
+  ns.experiment = ns.experiments?.page?.config
+    ? {
+      ...ns.experiments?.page?.config,
+      ...(ns.experiments?.page?.servedExperience
+        ? { servedExperience: ns.experiments?.page?.servedExperience }
+        : {}),
+    }
+    : null;
 }
 
 export async function loadLazy(document, options = {}) {
