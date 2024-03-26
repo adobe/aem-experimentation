@@ -489,16 +489,71 @@ async function runExperiment(document, pluginOptions) {
   );
 }
 
+async function getCampaignConfig(pluginOptions, metadata, overrides) {
+  if (!Object.keys(metadata).length) {
+    return null;
+  }
+
+  // Check UTM parameters
+  let campaign = overrides.value;
+  if (!campaign) {
+    const usp = new URLSearchParams(window.location.search);
+    if (usp.has('utm_campaign')) {
+      campaign = toClassName(usp.get('utm_campaign'));
+    }
+  } else {
+    campaign = toClassName(campaign);
+  }
+
+  if (metadata.audience) {
+    metadata.audiences = metadata.audience;
+  }
+
+  const audiences = stringToArray(metadata.audiences).map(toClassName);
+  const resolvedAudiences = await getResolvedAudiences(
+    audiences,
+    pluginOptions,
+  );
+  if (resolvedAudiences && !resolvedAudiences.length) {
+    return null;
+  }
+
+  const configuredCampaigns = Object.fromEntries(Object.entries(metadata)
+    .filter(([key]) => !['audience', 'audiences'].includes(key)));
+
+  return {
+    audiences,
+    configuredCampaigns,
+    resolvedAudiences,
+    selectedCampaign: campaign && metadata[campaign]
+      ? campaign
+      : null,
+  };
+}
+
+function getUrlFromCampaignConfig(config) {
+  return config.selectedCampaign
+    ? config.configuredCampaigns[config.selectedCampaign]
+    : null;
+}
+
 async function runCampaign(document, options) {
   const pluginOptions = { ...DEFAULT_OPTIONS, ...(options || {}) };
   return applyAllModifications(
     pluginOptions.campaignsMetaTagPrefix,
     pluginOptions.campaignsQueryParameter,
     pluginOptions,
-    () => {},
-    async (config) => { console.log('campaign', config); return null; },
-    (el, config, res) => {
-      console.log(el, res);
+    getCampaignConfig,
+    getUrlFromCampaignConfig,
+    (el, config, result) => {
+      const { selectedAudience = 'default' } = config;
+      el.classList.add(`campaign-${toClassName(selectedAudience)}`);
+      if (pluginOptions.trackingFunction) {
+        pluginOptions.trackingFunction('campaign', {
+          source: el.className,
+          target: result ? selectedAudience : 'default',
+        });
+      }
     },
   );
 }
@@ -509,18 +564,21 @@ async function getAudienceConfig(pluginOptions, metadata, overrides) {
   }
 
   const configuredAudiencesName = Object.keys(metadata).map(toClassName);
-  const audiences = await getResolvedAudiences(
+  const resolvedAudiences = await getResolvedAudiences(
     configuredAudiencesName,
     pluginOptions,
   );
-  if (!audiences?.length) {
+  if (resolvedAudiences && !resolvedAudiences.length) {
     return false;
   }
 
-  const selectedAudience = overrides.audience || audiences[0];
+  const selectedAudience = overrides.audience || resolvedAudiences[0];
 
-  return { configuredAudiences: metadata, selectedAudience };
-  // configuredAudiences[selectedAudience]
+  return {
+    configuredAudiences: metadata,
+    resolvedAudiences,
+    selectedAudience,
+  };
 }
 
 function getUrlFromAudienceConfig(config) {
@@ -562,9 +620,18 @@ export async function loadEager(document, options = {}) {
   // Backward compatibility
   ns.experiment = ns.experiments?.page?.config
     ? {
-      ...ns.experiments?.page?.config,
-      ...(ns.experiments?.page?.servedExperience
-        ? { servedExperience: ns.experiments?.page?.servedExperience }
+      ...ns.experiments.page.config,
+      ...(ns.experiments.page.servedExperience
+        ? { servedExperience: ns.experiments.page.servedExperience }
+        : {}),
+    }
+    : null;
+  ns.audience = ns.audiences?.page?.config
+    ? {
+      audiences: ns.audiences.page.config.configuredAudiences,
+      selectedAudience: ns.audiences.page.config.serveAudience,
+      ...(ns.audiences.page.servedExperience
+        ? { servedExperience: ns.audiences.page.servedExperience }
         : {}),
     }
     : null;

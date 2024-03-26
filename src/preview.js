@@ -412,44 +412,33 @@ function createCampaign(campaign, isSelected, options) {
  * @return {Object} returns a badge or empty string
  */
 async function decorateCampaignPill(overlay, options) {
-  const campaigns = getAllMetadata(options.campaignsMetaTagPrefix);
-  if (!Object.keys(campaigns).length) {
+  const config = window.hlx?.campaigns?.page?.config || {
+    configuredCampaigns: getAllMetadata(options.campaignsMetaTagPrefix),
+    selectedCampaign: window.hlx?.campaign?.selectedCampaign,
+  };
+  if (!config) {
     return;
   }
-
-  const usp = new URLSearchParams(window.location.search);
-  const forcedAudience = usp.has(options.audiencesQueryParameter)
-    ? toClassName(usp.get(options.audiencesQueryParameter))
-    : null;
-  const audiences = campaigns.audience?.split(',').map(toClassName) || [];
-  const resolvedAudiences = await getResolvedAudiences(audiences, options);
-  const isActive = forcedAudience
-    ? audiences.includes(forcedAudience)
-    : (!resolvedAudiences || !!resolvedAudiences.length);
-  const campaign = (usp.has(options.campaignsQueryParameter)
-    ? toClassName(usp.get(options.campaignsQueryParameter))
-    : null)
-    || (usp.has('utm_campaign') ? toClassName(usp.get('utm_campaign')) : null);
   const pill = createPopupButton(
-    `Campaign: ${campaign || 'default'}`,
+    `Campaign: ${config.selectedCampaign || 'default'}`,
     {
       label: 'Campaigns on this page:',
       description: `
         <div class="hlx-details">
-          ${audiences.length && resolvedAudiences?.length ? `Audience: ${resolvedAudiences[0]}` : ''}
-          ${audiences.length && !resolvedAudiences?.length ? 'No audience resolved' : ''}
-          ${!audiences.length || !resolvedAudiences ? 'No audience configured' : ''}
+          ${config.audiences.length && config.resolvedAudiences?.length ? `Audience: ${config.resolvedAudiences[0]}` : ''}
+          ${config.audiences.length && !config.resolvedAudiences?.length ? 'No audience resolved' : ''}
+          ${!config.audiences.length || !config.resolvedAudiences ? 'No audience configured' : ''}
         </div>`,
     },
     [
-      createCampaign('default', !campaign || !isActive, options),
-      ...Object.keys(campaigns)
+      createCampaign('default', !config.selectedCampaign || config.selectedCampaign === 'default', options),
+      ...Object.keys(config.configuredCampaigns)
         .filter((c) => c !== 'audience')
-        .map((c) => createCampaign(c, isActive && toClassName(campaign) === c, options)),
+        .map((c) => createCampaign(c, config.selectedCampaign === c, options)),
     ],
   );
 
-  if (campaign && isActive) {
+  if (config.selectedCampaign) {
     pill.classList.add('is-active');
   }
   overlay.append(pill);
