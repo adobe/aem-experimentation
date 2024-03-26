@@ -9,6 +9,12 @@
  * OF ANY KIND, either express or implied. See the License for the specific language
  * governing permissions and limitations under the License.
  */
+// eslint-disable-next-line import/no-cycle
+import {
+  debug,
+  getMetadata,
+  toClassName,
+} from './index.js';
 
 const DOMAIN_KEY_NAME = 'aem-domainkey';
 
@@ -25,10 +31,10 @@ class AemExperimentationBar extends HTMLElement {
       shadow.querySelector('.hlx-preview-overlay').removeAttribute('hidden');
     };
     shadow.append(link);
+    shadow.append(link);
 
     const el = document.createElement('div');
     el.className = 'hlx-preview-overlay';
-    el.setAttribute('hidden', true);
     shadow.append(el);
   }
 }
@@ -43,7 +49,7 @@ function getOverlay() {
   let overlay = document.querySelector('aem-experimentation-bar')?.shadowRoot.children[1];
   if (!overlay) {
     const el = createPreviewOverlay();
-    document.body.append(el);
+    document.body.prepend(el);
     [, overlay] = el.shadowRoot.children;
   }
   return overlay;
@@ -107,13 +113,24 @@ function createPopupDialog(header, items = []) {
   return popup;
 }
 
-function createPopupButton(label, header, items) {
+function createPopupButton(label, header, items, eventListeners = {}) {
   const button = createButton(label);
   const popup = createPopupDialog(header, items);
   button.innerHTML += '<span class="hlx-open"></span>';
   button.append(popup);
-  button.addEventListener('click', () => {
+  button.addEventListener('click', (ev) => {
+    if (ev.target.closest('.hlx-popup')) {
+      return;
+    }
+    getOverlay().querySelectorAll('.hlx-badge .hlx-popup:not(.hlx-hidden)').forEach((el) => {
+      if (el !== popup) {
+        el.classList.toggle('hlx-hidden', true);
+      }
+    });
     popup.classList.toggle('hlx-hidden');
+  });
+  Object.entries(eventListeners).forEach(([evt, listener]) => {
+    button.addEventListener(evt, listener);
   });
   return button;
 }
@@ -286,7 +303,7 @@ async function fetchRumData(experiment, options) {
 
 function populatePerformanceMetrics(div, config, {
   richVariants, totals, variantsAsNums, winner,
-}, conversionName = 'click') {
+}, conversionName) {
   // add summary
   const summary = div.querySelector('.hlx-info');
   summary.innerHTML = `Showing results for ${bigcountformat.format(totals.total_experimentations)} visits and ${bigcountformat.format(totals.total_conversions)} conversions: `;
@@ -302,7 +319,7 @@ function populatePerformanceMetrics(div, config, {
 
   // add traffic allocation to control and each variant
   config.variantNames.forEach((variantName, index) => {
-    const variantDiv = document.querySelector('aem-experimentation-bar')?.shadowRoot.querySelectorAll('.hlx-popup-item')[index];
+    const variantDiv = getOverlay().querySelectorAll('.hlx-popup-item')[index];
     const percentage = variantDiv.querySelector('.percentage');
     percentage.innerHTML = `
       <span title="${countformat.format(richVariants[variantName].variant_conversion_events)} real events">${bigcountformat.format(richVariants[variantName].variant_conversions)} ${conversionName} events</span> /
@@ -313,7 +330,7 @@ function populatePerformanceMetrics(div, config, {
 
   // add click rate and significance to each variant
   variantsAsNums.forEach((result) => {
-    const variant = document.querySelector('aem-experimentation-bar')?.shadowRoot.querySelectorAll('.hlx-popup-item')[config.variantNames.indexOf(result.variant)];
+    const variant = getOverlay().querySelectorAll('.hlx-popup-item')[config.variantNames.indexOf(result.variant)];
     if (variant) {
       const performance = variant.querySelector('.performance');
       performance.innerHTML = `
@@ -329,19 +346,18 @@ function populatePerformanceMetrics(div, config, {
  * Create Badge if a Page is enlisted in a AEM Experiment
  * @return {Object} returns a badge or empty string
  */
-async function decorateExperimentPill(overlay, options, context) {
-  const config = window?.hlx?.experiment;
-  const experiment = context.toClassName(context.getMetadata(options.experimentsMetaTag));
-  if (!experiment || !config) {
+async function decorateExperimentPill({ el, config }, container, options) {
+  if (!config) {
     return;
   }
   // eslint-disable-next-line no-console
-  console.log('preview experiment', experiment);
+  debug('preview experiment', config.id);
 
   const domainKey = window.localStorage.getItem(DOMAIN_KEY_NAME);
-  const conversionName = config.conversionName
-    || context.getMetadata('conversion-name')
-    || 'click';
+  const conversionName = (el.tagName === 'MAIN'
+    ? toClassName(getMetadata('conversion-name'))
+    : el.dataset.conversionName
+  ) || 'click';
   const pill = createPopupButton(
     `Experiment: ${config.id}`,
     {
@@ -352,8 +368,8 @@ async function decorateExperimentPill(overlay, options, context) {
           ${config.resolvedAudiences ? ', ' : ''}
           ${config.resolvedAudiences && config.resolvedAudiences.length ? config.resolvedAudiences[0] : ''}
           ${config.resolvedAudiences && !config.resolvedAudiences.length ? 'No audience resolved' : ''}
-          ${config.variants[config.variantNames[0]].blocks.length ? ', Blocks: ' : ''}
-          ${config.variants[config.variantNames[0]].blocks.join(',')}
+          ${config.variants[config.variantNames[0]].blocks?.length ? ', Blocks: ' : ''}
+          ${config.variants[config.variantNames[0]].blocks?.join(',') || ''}
         </div>
         <div class="hlx-info">How is it going?</div>`,
       actions: [
@@ -368,9 +384,8 @@ async function decorateExperimentPill(overlay, options, context) {
             );
             if (key && key.match(/[a-f0-9-]+/)) {
               window.localStorage.setItem(DOMAIN_KEY_NAME, key);
-              const performanceMetrics = await fetchRumData(experiment, {
+              const performanceMetrics = await fetchRumData(config.id, {
                 ...options,
-                conversionName,
                 domainKey: key,
               });
               if (performanceMetrics === null) {
@@ -384,20 +399,46 @@ async function decorateExperimentPill(overlay, options, context) {
         },
       ],
     },
-    config.variantNames.map((vname) => createVariant(experiment, vname, config, options)),
+    config.variantNames.map((vname) => createVariant(config.id, vname, config, options)),
+    {
+      click: (ev) => {
+        if (!ev.target.querySelector('.hlx-hidden')) {
+          el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        }
+      },
+      mouseenter: () => { el.classList.add('hlx-highlight'); },
+      mouseleave: () => {
+        document.querySelectorAll('.hlx-highlight')
+          .forEach((e) => e.classList.remove('hlx-highlight'));
+      },
+    },
   );
   if (config.run) {
-    pill.classList.add(`is-${context.toClassName(config.status)}`);
+    pill.classList.add(`is-${toClassName(config.status)}`);
   }
-  overlay.append(pill);
-
-  const performanceMetrics = await fetchRumData(experiment, {
-    ...options, domainKey, conversionName,
+  container.append(pill);
+  const performanceMetrics = await fetchRumData(config.id, {
+    ...options, conversionName, domainKey,
   });
   if (performanceMetrics === null) {
     return;
   }
   populatePerformanceMetrics(pill, config, performanceMetrics, conversionName);
+}
+
+async function decorateExperimentPills(container, options) {
+  const ns = window.aem || window.hlx;
+  if (!ns?.experiments) {
+    return null;
+  }
+
+  const configs = [].concat(
+    ns.experiments.page ? [ns.experiments.page] : [],
+    ns.experiments.sections,
+    ns.experiments.fragments,
+  );
+
+  return Promise.all(configs.map((c) => decorateExperimentPill(c, container, options)));
 }
 
 function createCampaign(campaign, isSelected, options) {
@@ -419,48 +460,60 @@ function createCampaign(campaign, isSelected, options) {
  * Create Badge if a Page is enlisted in a AEM Campaign
  * @return {Object} returns a badge or empty string
  */
-async function decorateCampaignPill(overlay, options, context) {
-  const campaigns = context.getAllMetadata(options.campaignsMetaTagPrefix);
-  if (!Object.keys(campaigns).length) {
+async function decorateCampaignPill({ el, config }, container, options) {
+  if (!config) {
     return;
   }
-
-  const usp = new URLSearchParams(window.location.search);
-  const forcedAudience = usp.has(options.audiencesQueryParameter)
-    ? context.toClassName(usp.get(options.audiencesQueryParameter))
-    : null;
-  const audiences = campaigns.audience?.split(',').map(context.toClassName) || [];
-  const resolvedAudiences = await context.getResolvedAudiences(audiences, options);
-  const isActive = forcedAudience
-    ? audiences.includes(forcedAudience)
-    : (!resolvedAudiences || !!resolvedAudiences.length);
-  const campaign = (usp.has(options.campaignsQueryParameter)
-    ? context.toClassName(usp.get(options.campaignsQueryParameter))
-    : null)
-    || (usp.has('utm_campaign') ? context.toClassName(usp.get('utm_campaign')) : null);
   const pill = createPopupButton(
-    `Campaign: ${campaign || 'default'}`,
+    `Campaign: ${config.selectedCampaign || 'default'}`,
     {
       label: 'Campaigns on this page:',
       description: `
         <div class="hlx-details">
-          ${audiences.length && resolvedAudiences?.length ? `Audience: ${resolvedAudiences[0]}` : ''}
-          ${audiences.length && !resolvedAudiences?.length ? 'No audience resolved' : ''}
-          ${!audiences.length || !resolvedAudiences ? 'No audience configured' : ''}
+          ${config.audiences.length && config.resolvedAudiences?.length ? `Audience: ${config.resolvedAudiences[0]}` : ''}
+          ${config.audiences.length && !config.resolvedAudiences?.length ? 'No audience resolved' : ''}
+          ${!config.audiences.length || !config.resolvedAudiences ? 'No audience configured' : ''}
         </div>`,
     },
     [
-      createCampaign('default', !campaign || !isActive, options),
-      ...Object.keys(campaigns)
+      createCampaign('default', !config.selectedCampaign || config.selectedCampaign === 'default', options),
+      ...Object.keys(config.configuredCampaigns)
         .filter((c) => c !== 'audience')
-        .map((c) => createCampaign(c, isActive && context.toClassName(campaign) === c, options)),
+        .map((c) => createCampaign(c, config.selectedCampaign === c, options)),
     ],
+    {
+      click: (ev) => {
+        if (!ev.target.querySelector('.hlx-hidden')) {
+          el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        }
+      },
+      mouseenter: () => { el.classList.add('hlx-highlight'); },
+      mouseleave: () => {
+        document.querySelectorAll('.hlx-highlight')
+          .forEach((e) => e.classList.remove('hlx-highlight'));
+      },
+    },
   );
 
-  if (campaign && isActive) {
+  if (config.selectedCampaign) {
     pill.classList.add('is-active');
   }
-  overlay.append(pill);
+  container.append(pill);
+}
+
+async function decorateCampaignPills(container, options) {
+  const ns = window.aem || window.hlx;
+  if (!ns?.campaigns) {
+    return null;
+  }
+
+  const configs = [].concat(
+    ns.campaigns.page ? [ns.campaigns.page] : [],
+    ns.campaigns.sections,
+    ns.campaigns.fragments,
+  );
+
+  return Promise.all(configs.map((c) => decorateCampaignPill(c, container, options)));
 }
 
 function createAudience(audience, isSelected, options) {
@@ -478,46 +531,72 @@ function createAudience(audience, isSelected, options) {
  * Create Badge if a Page is enlisted in a AEM Audiences
  * @return {Object} returns a badge or empty string
  */
-async function decorateAudiencesPill(overlay, options, context) {
-  const audiences = context.getAllMetadata(options.audiencesMetaTagPrefix);
-  if (!Object.keys(audiences).length || !Object.keys(options.audiences).length) {
+async function decorateAudiencesPill({ el, config }, container, options) {
+  if (!config) {
+    return;
+  }
+  const configuredAudienceNames = Object.keys(config.configuredAudiences);
+  if (!Object.keys(config.configuredAudiences).length || !Object.keys(options.audiences).length) {
     return;
   }
 
-  const resolvedAudiences = await context.getResolvedAudiences(
-    Object.keys(audiences),
-    options,
-    context,
-  );
   const pill = createPopupButton(
-    'Audiences',
+    `Audience: ${config.selectedAudience || 'default'}`,
     {
       label: 'Audiences for this page:',
     },
     [
-      createAudience('default', !resolvedAudiences.length || resolvedAudiences[0] === 'default', options),
-      ...Object.keys(audiences)
+      createAudience('default', !config.selectedAudience || config.selectedAudience === 'default', options),
+      ...configuredAudienceNames
         .filter((a) => a !== 'audience')
-        .map((a) => createAudience(a, resolvedAudiences && resolvedAudiences[0] === a, options)),
+        .map((a) => createAudience(a, config.selectedAudience === a, options)),
     ],
+    {
+      click: (ev) => {
+        if (!ev.target.querySelector('.hlx-hidden')) {
+          el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        }
+      },
+      mouseenter: () => { el.classList.add('hlx-highlight'); },
+      mouseleave: () => {
+        document.querySelectorAll('.hlx-highlight')
+          .forEach((e) => e.classList.remove('hlx-highlight'));
+      },
+    },
   );
 
-  if (resolvedAudiences.length) {
+  if (config.selectedAudience) {
     pill.classList.add('is-active');
   }
-  overlay.append(pill);
+  container.append(pill);
+}
+
+async function decorateAudiencesPills(container, options) {
+  const ns = window.aem || window.hlx;
+  if (!ns?.audiences) {
+    return null;
+  }
+
+  const configs = [].concat(
+    ns.audiences.page ? [ns.audiences.page] : [],
+    ns.audiences.sections,
+    ns.audiences.fragments,
+  );
+
+  return Promise.all(configs.map((c) => decorateAudiencesPill(c, container, options)));
 }
 
 /**
  * Decorates Preview mode badges and overlays
  * @return {Object} returns a badge or empty string
  */
-export default async function decoratePreviewMode(document, options, context) {
+export default async function decoratePreviewMode(document, options) {
   try {
-    const overlay = getOverlay(options);
-    await decorateAudiencesPill(overlay, options, context);
-    await decorateCampaignPill(overlay, options, context);
-    await decorateExperimentPill(overlay, options, context);
+    const overlay = getOverlay();
+
+    await decorateAudiencesPills(overlay, options);
+    await decorateCampaignPills(overlay, options);
+    await decorateExperimentPills(overlay, options);
   } catch (e) {
     // eslint-disable-next-line no-console
     console.log(e);
