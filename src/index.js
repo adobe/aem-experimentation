@@ -12,7 +12,7 @@
 const MAX_SAMPLING_RATE = 10; // At a maximum we sample 1 in 10 requests
 
 let isDebugEnabled = false;
-function debug(...args) {
+export function debug(...args) {
   if (isDebugEnabled) {
     console.debug.call(this, '[experimentation]', ...args);
   }
@@ -50,7 +50,7 @@ function stringToArray(str) {
  * @param {String} name The unsanitized name
  * @returns {String} The class name
  */
-function toClassName(name) {
+export function toClassName(name) {
   return typeof name === 'string'
     ? name.toLowerCase().replace(/[^0-9a-z]/gi, '-').replace(/-+/g, '-').replace(/^-|-$/g, '')
     : '';
@@ -61,7 +61,7 @@ function toClassName(name) {
  * @param {String} name The unsanitized name
  * @returns {String} The camelCased name
  */
-function toCamelCase(name) {
+export function toCamelCase(name) {
   return toClassName(name).replace(/-([a-z])/g, (g) => g[1].toUpperCase());
 }
 
@@ -70,7 +70,7 @@ function toCamelCase(name) {
  * @param {String} name The metadata name (or property)
  * @returns {String} The metadata value(s)
  */
-function getMetadata(name) {
+export function getMetadata(name) {
   const attr = name && name.includes(':') ? 'property' : 'name';
   const meta = [...document.head.querySelectorAll(`meta[${attr}="${name}"]`)].map((m) => m.content).join(', ');
   return meta || '';
@@ -81,7 +81,7 @@ function getMetadata(name) {
  * @param {String} scope The scope/prefix for the metadata
  * @returns a map of key/value pairs for the given scope
  */
-function getAllMetadata(scope) {
+export function getAllMetadata(scope) {
   const value = getMetadata(scope);
   return [...document.head.querySelectorAll(`meta[property^="${scope}:"],meta[name^="${scope}-"]`)]
     .reduce((res, meta) => {
@@ -404,6 +404,7 @@ async function getExperimentConfig(pluginOptions, metadata, overrides) {
     status: metadata.status || 'active',
     audiences,
     endDate,
+    resolvedAudiences,
     startDate,
     variants,
     variantNames,
@@ -442,8 +443,7 @@ function getUrlFromExperimentConfig(config) {
     : null;
 }
 
-async function runExperiment(document, options) {
-  const pluginOptions = { ...DEFAULT_OPTIONS, ...(options || {}) };
+async function runExperiment(document, pluginOptions) {
   return applyExperienceModifications(
     pluginOptions.experimentsMetaTag,
     pluginOptions.experimentsQueryParameter,
@@ -500,16 +500,33 @@ async function serveAudience(document, options) {
   );
 }
 
-export async function loadEager(document, options) {
+export async function loadEager(document, options = {}) {
+  const pluginOptions = { ...DEFAULT_OPTIONS, ...options };
   const { host, hostname, origin } = window.location;
   isDebugEnabled = !window.location.hostname.endsWith('.live')
-    && (options.isProd !== 'function' || !options.isProd())
-    && (!options.prodHost || ![host, hostname, origin].includes(options.prodHost));
+    && (pluginOptions.isProd !== 'function' || !pluginOptions.isProd())
+    && (!pluginOptions.prodHost || ![host, hostname, origin].includes(pluginOptions.prodHost));
   window.hlx ||= {};
-  window.hlx.expriments = await runExperiment(document, options);
-  window.hlx.campaigns = await runCampaign(document, options);
-  window.hlx.audiences = await serveAudience(document, options);
-  console.log(window.hlx);
+  window.hlx.experiments = await runExperiment(document, pluginOptions);
+  window.hlx.campaigns = await runCampaign(document, pluginOptions);
+  window.hlx.audiences = await serveAudience(document, pluginOptions);
+  debug(window.hlx);
+}
+
+export async function loadLazy(document, options = {}) {
+  const pluginOptions = { ...DEFAULT_OPTIONS, ...options };
+  // do not show the experimentation pill on prod domains
+  if (window.location.hostname.endsWith('.live')
+    || (typeof options.isProd === 'function' && options.isProd())
+    || (options.prodHost
+        && (options.prodHost === window.location.host
+          || options.prodHost === window.location.hostname
+          || options.prodHost === window.location.origin))) {
+    return;
+  }
+  // eslint-disable-next-line import/no-cycle
+  const preview = await import('./preview.js');
+  preview.default(document, pluginOptions);
 }
 
 // /**
