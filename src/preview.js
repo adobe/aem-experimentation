@@ -170,7 +170,8 @@ function createVariant(experiment, variantName, config, options) {
 
   const experimentURL = new URL(window.location.href);
   // this will retain other query params such as ?rum=on
-  experimentURL.searchParams.set(options.experimentsQueryParameter, `${experiment}/${variantName}`);
+  experimentURL.searchParams.set(options.experimentsQueryParameter, experiment);
+  experimentURL.searchParams.set(`${options.experimentsQueryParameter}-variant`, variantName);
 
   return {
     label: `<code>${variantName}</code>`,
@@ -329,7 +330,8 @@ function populatePerformanceMetrics(div, config, {
  * @return {Object} returns a badge or empty string
  */
 async function decorateExperimentPill(overlay, options) {
-  const config = window.hlx?.experiments?.page?.config || window.hlx?.experiment;
+  const ns = window.aem || window.hlx;
+  const config = ns?.experiments?.page?.config;
   if (!config) {
     return;
   }
@@ -412,10 +414,8 @@ function createCampaign(campaign, isSelected, options) {
  * @return {Object} returns a badge or empty string
  */
 async function decorateCampaignPill(overlay, options) {
-  const config = window.hlx?.campaigns?.page?.config || {
-    configuredCampaigns: getAllMetadata(options.campaignsMetaTagPrefix),
-    selectedCampaign: window.hlx?.campaign?.selectedCampaign,
-  };
+  const ns = window.aem || window.hlx;
+  const config = ns?.campaigns?.page?.config;
   if (!config) {
     return;
   }
@@ -460,10 +460,8 @@ function createAudience(audience, isSelected, options) {
  * @return {Object} returns a badge or empty string
  */
 async function decorateAudiencesPill(overlay, options) {
-  const config = window.hlx?.audiences?.page?.config || {
-    configuredAudiences: getAllMetadata(options.audiencesMetaTagPrefix),
-    selectedAudience: window.hlx?.audience?.selectedAudience,
-  };
+  const ns = window.aem || window.hlx;
+  const config = ns?.audiences?.page?.config;
   if (!config) {
     return;
   }
@@ -496,8 +494,9 @@ async function decorateAudiencesPill(overlay, options) {
  * @return {Object} returns a badge or empty string
  */
 export default async function decoratePreviewMode(document, options) {
+  const ns = window.aem || window.hlx;
   try {
-    loadCSS(`${options.basePath || window.hlx.codeBasePath}/plugins/experimentation/src/preview.css`);
+    loadCSS(`${options.basePath || ns.codeBasePath}/plugins/experimentation/src/preview.css`);
     const overlay = getOverlay(options);
     await decorateAudiencesPill(overlay, options);
     await decorateCampaignPill(overlay, options);
