@@ -26,6 +26,12 @@ git subtree pull --squash --prefix plugins/experimentation git@github.com:adobe/
 
 If you prefer using `https` links you'd replace `git@github.com:adobe/aem-experimentation.git` in the above commands by `https://github.com/adobe/aem-experimentation.git`.
 
+If the `subtree pull` command is failing with an error like:
+```
+fatal: can't squash-merge: 'plugins/experimentation' was never added
+```
+you can just delete the folder and re-add the plugin via the `git subtree add` command above.
+
 ## Project instrumentation
 
 :warning: The plugin requires that you have a recent RUM instrumentation from the AEM boilerplate that supports `sampleRUM.always`. If you are getting errors that `.on` cannot be called on an `undefined` object, please apply the changes from https://github.com/adobe/aem-boilerplate/pull/247/files to your `lib-franklin.js`.
