@@ -89,12 +89,13 @@ async function replaceInner(path, main) {
     const html = await resp.text();
     // parse with DOMParser to guarantee valid HTML, and no script execution(s)
     const dom = new DOMParser().parseFromString(html, 'text/html');
-    // eslint-disable-next-line no-param-reassign
-    main.replaceWith(dom.querySelector('main'));
+    // do not use replaceWith API here since this would replace the main reference
+    // in scripts.js as well and prevent proper decoration of the sections/blocks
+    main.innerHTML = dom.querySelector('main').innerHTML;
     return path;
   } catch (e) {
     // eslint-disable-next-line no-console
-    console.log(`error loading content: ${plainPath}`, e);
+    console.log(`error loading content: ${path}`, e);
   }
   return null;
 }
