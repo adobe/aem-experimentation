@@ -241,9 +241,10 @@ function getConfigForInstantExperiment(
     variantNames: [],
   };
 
-  const pages = Number.isNaN(instantExperiment)
+  const nbOfVariants = Number(instantExperiment);
+  const pages = Number.isNaN(nbOfVariants)
     ? instantExperiment.split(',').map((p) => new URL(p.trim(), window.location).pathname)
-    : new Array(Number(instantExperiment)).fill(window.location.pathname);
+    : new Array(nbOfVariants).fill(window.location.pathname);
 
   const splitString = context.getMetadata(`${pluginOptions.experimentsMetaTag}-split`);
   const splits = splitString
@@ -438,6 +439,8 @@ export async function runExperiment(document, options, context) {
   console.debug(`running experiment (${window.hlx.experiment.id}) -> ${window.hlx.experiment.selectedVariant}`);
 
   if (experimentConfig.selectedVariant === experimentConfig.variantNames[0]) {
+    document.body.classList.add(`experiment-${context.toClassName(experimentConfig.id)}`);
+    document.body.classList.add(`variant-${context.toClassName(experimentConfig.selectedVariant)}`);
     context.sampleRUM('experiment', {
       source: experimentConfig.id,
       target: experimentConfig.selectedVariant,
