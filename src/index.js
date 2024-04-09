@@ -241,7 +241,9 @@ function getConfigForInstantExperiment(
     variantNames: [],
   };
 
-  const pages = instantExperiment.split(',').map((p) => new URL(p.trim(), window.location).pathname);
+  const pages = Number.isNaN(instantExperiment)
+    ? instantExperiment.split(',').map((p) => new URL(p.trim(), window.location).pathname)
+    : new Array(Number(instantExperiment)).fill(window.location.pathname);
 
   const splitString = context.getMetadata(`${pluginOptions.experimentsMetaTag}-split`);
   const splits = splitString
@@ -451,13 +453,18 @@ export async function runExperiment(document, options, context) {
   const currentPath = window.location.pathname;
   const control = experimentConfig.variants[experimentConfig.variantNames[0]];
   const index = control.pages.indexOf(currentPath);
-  if (index < 0 || pages[index] === currentPath) {
+  if (index < 0) {
     return false;
   }
 
   // Fullpage content experiment
   document.body.classList.add(`experiment-${context.toClassName(experimentConfig.id)}`);
-  const result = await replaceInner(pages[index], document.querySelector('main'));
+  let result;
+  if (pages[index] !== currentPath) {
+    result = await replaceInner(pages[index], document.querySelector('main'));
+  } else {
+    result = currentPath;
+  }
   experimentConfig.servedExperience = result || currentPath;
   if (!result) {
     // eslint-disable-next-line no-console
