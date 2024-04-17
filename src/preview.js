@@ -99,7 +99,7 @@ function createPopupDialog(header, items = []) {
     list.append(createPopupItem(item));
   });
   const buttons = [...popup.querySelectorAll('.hlx-popup-header-actions .hlx-button a')];
-  actions.forEach((action, index) => {
+  header.actions?.forEach((action, index) => {
     if (action.onclick) {
       buttons[index].addEventListener('click', action.onclick);
     }
