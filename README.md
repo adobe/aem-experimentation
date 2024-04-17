@@ -11,7 +11,7 @@ The AEM Experimentation plugin supports:
 - :money_with_wings: serving different content variations based on marketing campaigns you are running, so that you can easily track email and/or social campaigns.
 - :chart_with_upwards_trend: running A/B test experiments on a set of variants to measure and improve the conversion on your site. This works particularly with our :chart: [RUM conversion tracking plugin](https://github.com/adobe/franklin-rum-conversion).
 - :rocket: easy simulation of each experience and basic reporting leveraging in-page overlays.
-- :lock: privacy, as it doesn't use any nor persist any end-user data that could lead to their identification. No end-user opt-in nor cookie consent needed.
+- :lock: privacy, as it doesn't use any nor persist any end-user data that could lead to their identification. No end-user opt-in nor cookie consent needed when used in its default configuration. Bringing additional marketing technology such as visitor-based analytics or personalization to a project will cancel this privacy-first principle.
 
 ## Installation
 
