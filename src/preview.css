@@ -146,6 +146,8 @@
 .hlx-popup-items {
   overflow-y: auto;
   grid-area: content;
+  scrollbar-gutter: stable;
+  scrollbar-width: thin;
 }
 
 .hlx-popup-header-label {
@@ -185,7 +187,7 @@
   height: 0;
   position: absolute;
   border-left: 15px solid transparent;
-  border-right: 15px solid transparent;    
+  border-right: 15px solid transparent;
   border-top: 15px solid #444;
   bottom: -15px;
   right: 50%;
@@ -209,7 +211,7 @@
 .hlx-popup-item {
   display: grid;
   grid-template:
-    "label actions" 
+    "label actions"
     "description actions"
     / 1fr min-content;
   margin: 1em;
