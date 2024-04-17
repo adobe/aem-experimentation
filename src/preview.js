@@ -12,9 +12,47 @@
 
 const DOMAIN_KEY_NAME = 'aem-domainkey';
 
-function createPreviewOverlay(cls) {
-  const overlay = document.createElement('div');
-  overlay.className = cls;
+class AemExperimentationBar extends HTMLElement {
+  static observedAttributes = ['color', 'size'];
+
+  connectedCallback() {
+    // Create a shadow root
+    const shadow = this.attachShadow({ mode: 'open' });
+
+    const cssPath = new URL(new Error().stack.split('\n')[2].match(/[a-z]+:[^:]+/)[0]).pathname.replace('preview.js', 'preview.css');
+    const link = document.createElement('link');
+    link.rel = 'stylesheet';
+    link.href = cssPath;
+    link.onload = () => {
+      shadow.querySelector('.hlx-preview-overlay').removeAttribute('hidden');
+    };
+    shadow.append(link);
+
+    const el = document.createElement('div');
+    el.className = 'hlx-preview-overlay';
+    el.setAttribute('hidden', true);
+    shadow.append(el);
+  }
+
+  // eslint-disable-next-line class-methods-use-this
+  attributeChangedCallback(name, oldValue, newValue) {
+    console.log(`Attribute ${name} has changed. ${oldValue} => ${newValue}`);
+  }
+}
+customElements.define('aem-experimentation-bar', AemExperimentationBar);
+
+function createPreviewOverlay() {
+  const overlay = document.createElement('aem-experimentation-bar');
+  return overlay;
+}
+
+function getOverlay() {
+  let overlay = document.querySelector('aem-experimentation-bar')?.shadowRoot.children[1];
+  if (!overlay) {
+    const el = createPreviewOverlay();
+    document.body.append(el);
+    [, overlay] = el.shadowRoot.children;
+  }
   return overlay;
 }
 
@@ -101,15 +139,6 @@ function createToggleButton(label) {
     button.setAttribute('aria-pressed', button.getAttribute('aria-pressed') === 'false');
   });
   return button;
-}
-
-function getOverlay() {
-  let overlay = document.querySelector('.hlx-preview-overlay');
-  if (!overlay) {
-    overlay = createPreviewOverlay('hlx-preview-overlay');
-    document.body.append(overlay);
-  }
-  return overlay;
 }
 
 const percentformat = new Intl.NumberFormat('en-US', { style: 'percent', maximumSignificantDigits: 2 });
@@ -485,7 +514,6 @@ async function decorateAudiencesPill(overlay, options, context) {
  */
 export default async function decoratePreviewMode(document, options, context) {
   try {
-    context.loadCSS(`${options.basePath || window.hlx.codeBasePath}/plugins/experimentation/src/preview.css`);
     const overlay = getOverlay(options);
     await decorateAudiencesPill(overlay, options, context);
     await decorateCampaignPill(overlay, options, context);
