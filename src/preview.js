@@ -13,8 +13,6 @@
 const DOMAIN_KEY_NAME = 'aem-domainkey';
 
 class AemExperimentationBar extends HTMLElement {
-  static observedAttributes = ['color', 'size'];
-
   connectedCallback() {
     // Create a shadow root
     const shadow = this.attachShadow({ mode: 'open' });
@@ -32,11 +30,6 @@ class AemExperimentationBar extends HTMLElement {
     el.className = 'hlx-preview-overlay';
     el.setAttribute('hidden', true);
     shadow.append(el);
-  }
-
-  // eslint-disable-next-line class-methods-use-this
-  attributeChangedCallback(name, oldValue, newValue) {
-    console.log(`Attribute ${name} has changed. ${oldValue} => ${newValue}`);
   }
 }
 customElements.define('aem-experimentation-bar', AemExperimentationBar);
