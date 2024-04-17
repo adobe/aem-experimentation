@@ -71,7 +71,7 @@ function createPopupItem(item) {
     ${item.description ? `<div class="hlx-popup-item-description">${item.description}</div>` : ''}
     ${actions.length ? `<div class="hlx-popup-item-actions">${actions}</div>` : ''}`;
   const buttons = [...div.querySelectorAll('.hlx-button a')];
-  item.actions.forEach((action, index) => {
+  item.actions?.forEach((action, index) => {
     if (action.onclick) {
       buttons[index].addEventListener('click', action.onclick);
     }
