@@ -24,7 +24,7 @@
 }
 
 .hlx-preview-overlay {
-  z-index: 99;
+  z-index: 99999;
   position: fixed;
   color: #eee;
   font-size: 1rem;
