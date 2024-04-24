@@ -205,6 +205,7 @@ async function fetchRumData(experiment, options) {
   }
   resultsURL.searchParams.set('domainkey', options.domainKey);
   resultsURL.searchParams.set('experiment', experiment);
+  resultsURL.searchParams.set('conversioncheckpoint', options.conversionName);
 
   const response = await fetch(resultsURL.href);
   if (!response.ok) {
@@ -285,7 +286,7 @@ async function fetchRumData(experiment, options) {
 
 function populatePerformanceMetrics(div, config, {
   richVariants, totals, variantsAsNums, winner,
-}) {
+}, conversionName = 'click') {
   // add summary
   const summary = div.querySelector('.hlx-info');
   summary.innerHTML = `Showing results for ${bigcountformat.format(totals.total_experimentations)} visits and ${bigcountformat.format(totals.total_conversions)} conversions: `;
@@ -304,7 +305,7 @@ function populatePerformanceMetrics(div, config, {
     const variantDiv = document.querySelectorAll('.hlx-popup-item')[index];
     const percentage = variantDiv.querySelector('.percentage');
     percentage.innerHTML = `
-      <span title="${countformat.format(richVariants[variantName].variant_conversion_events)} real events">${bigcountformat.format(richVariants[variantName].variant_conversions)} clicks</span> /
+      <span title="${countformat.format(richVariants[variantName].variant_conversion_events)} real events">${bigcountformat.format(richVariants[variantName].variant_conversions)} ${conversionName} events</span> /
       <span title="${countformat.format(richVariants[variantName].variant_experimentation_events)} real events">${bigcountformat.format(richVariants[variantName].variant_experimentations)} visits</span>
       <span>(${percentformat.format(richVariants[variantName].variant_experimentations / totals.total_experimentations)} split)</span>
     `;
@@ -316,7 +317,7 @@ function populatePerformanceMetrics(div, config, {
     if (variant) {
       const performance = variant.querySelector('.performance');
       performance.innerHTML = `
-        <span>click rate: ${percentformat.format(result.variant_conversion_rate)}</span>
+        <span>${conversionName} conversion rate: ${percentformat.format(result.variant_conversion_rate)}</span>
         <span>vs. ${percentformat.format(result.control_conversion_rate)}</span>
         <span title="p value: ${result.p_value}" class="significance ${significanceformat.format(result.p_value).replace(/ /, '-')}">${significanceformat.format(result.p_value)}</span>
       `;
@@ -338,6 +339,7 @@ async function decorateExperimentPill(overlay, options, context) {
   console.log('preview experiment', experiment);
 
   const domainKey = window.localStorage.getItem(DOMAIN_KEY_NAME);
+  const conversionName = context.getMetadata('conversion-name') || 'click';
   const pill = createPopupButton(
     `Experiment: ${config.id}`,
     {
@@ -366,12 +368,13 @@ async function decorateExperimentPill(overlay, options, context) {
               window.localStorage.setItem(DOMAIN_KEY_NAME, key);
               const performanceMetrics = await fetchRumData(experiment, {
                 ...options,
+                conversionName,
                 domainKey: key,
               });
               if (performanceMetrics === null) {
                 return;
               }
-              populatePerformanceMetrics(pill, config, performanceMetrics);
+              populatePerformanceMetrics(pill, config, performanceMetrics, conversionName);
             } else if (key === '') {
               window.localStorage.removeItem(DOMAIN_KEY_NAME);
             }
@@ -390,7 +393,7 @@ async function decorateExperimentPill(overlay, options, context) {
   if (performanceMetrics === null) {
     return;
   }
-  populatePerformanceMetrics(pill, config, performanceMetrics);
+  populatePerformanceMetrics(pill, config, performanceMetrics, conversionName);
 }
 
 function createCampaign(campaign, isSelected, options) {
