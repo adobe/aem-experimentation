@@ -14,7 +14,7 @@ const MAX_SAMPLING_RATE = 10; // At a maximum we sample 1 in 10 requests
 export const DEFAULT_OPTIONS = {
   // Generic properties
   rumSamplingRate: MAX_SAMPLING_RATE, // 1 in 10 requests
-  overrideMetaFields: ['template', 'theme'],
+  overrideMetaFields: [],
 
   // Audiences related properties
   audiences: {},
