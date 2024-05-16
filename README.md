@@ -177,8 +177,6 @@ runEager.call(document, {
 
   /* Experimentation related properties */
   // See more details on the dedicated Experiments page linked below
-  experimentsRoot: '/experiments',
-  experimentsConfigFile: 'manifest.json',
   experimentsMetaTag: 'experiment',
   experimentsQueryParameter: 'experiment',
 }, pluginContext);
