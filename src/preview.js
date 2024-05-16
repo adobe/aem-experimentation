@@ -355,8 +355,8 @@ async function decorateExperimentPill({ el, config }, container, options) {
 
   const domainKey = window.localStorage.getItem(DOMAIN_KEY_NAME);
   const conversionName = (el.tagName === 'MAIN'
-    ? (toClassName(getMetadata('experiment-conversion-name')) || toClassName(getMetadata('conversion-name')))
-    : (el.dataset.experimentConversionName || el.dataset.conversionName)
+    ? toClassName(getMetadata('conversion-name'))
+    : el.dataset.conversionName
   ) || 'click';
   const pill = createPopupButton(
     `Experiment: ${config.id}`,
@@ -387,7 +387,6 @@ async function decorateExperimentPill({ el, config }, container, options) {
               const performanceMetrics = await fetchRumData(config.id, {
                 ...options,
                 domainKey: key,
-                conversionName,
               });
               if (performanceMetrics === null) {
                 return;
@@ -436,7 +435,6 @@ async function decorateExperimentPills(container, options) {
   const configs = [].concat(
     ns.experiments.page ? [ns.experiments.page] : [],
     ns.experiments.sections,
-    ns.experiments.fragments,
   );
 
   return Promise.all(configs.map((c) => decorateExperimentPill(c, container, options)));
@@ -511,7 +509,6 @@ async function decorateCampaignPills(container, options) {
   const configs = [].concat(
     ns.campaigns.page ? [ns.campaigns.page] : [],
     ns.campaigns.sections,
-    ns.campaigns.fragments,
   );
 
   return Promise.all(configs.map((c) => decorateCampaignPill(c, container, options)));
@@ -581,7 +578,6 @@ async function decorateAudiencesPills(container, options) {
   const configs = [].concat(
     ns.audiences.page ? [ns.audiences.page] : [],
     ns.audiences.sections,
-    ns.audiences.fragments,
   );
 
   return Promise.all(configs.map((c) => decorateAudiencesPill(c, container, options)));
