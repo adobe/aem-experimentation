@@ -355,8 +355,8 @@ async function decorateExperimentPill({ el, config }, container, options) {
 
   const domainKey = window.localStorage.getItem(DOMAIN_KEY_NAME);
   const conversionName = (el.tagName === 'MAIN'
-    ? toClassName(getMetadata('conversion-name'))
-    : el.dataset.conversionName
+    ? (toClassName(getMetadata('experiment-conversion-name')) || toClassName(getMetadata('conversion-name')))
+    : (el.dataset.experimentConversionName || el.dataset.conversionName)
   ) || 'click';
   const pill = createPopupButton(
     `Experiment: ${config.id}`,
@@ -387,6 +387,7 @@ async function decorateExperimentPill({ el, config }, container, options) {
               const performanceMetrics = await fetchRumData(config.id, {
                 ...options,
                 domainKey: key,
+                conversionName,
               });
               if (performanceMetrics === null) {
                 return;
