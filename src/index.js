@@ -679,10 +679,22 @@ function adjustedRumSamplingRate(checkpoint, options, context) {
   };
 }
 
+function adjustRumSampligRate(document, options, context) {
+  const checkpoints = ['audiences', 'campaign', 'experiment'];
+  if (context.sampleRUM.always) { // RUM v1.x
+    checkpoints.forEach((ck) => context.sampleRUM.always.on(ck, adjustedRumSamplingRate(ck, options, context)));
+  } else { // RUM 2.x
+    document.addEventListener('rum', (event) => {
+      if (event.detail && event.detail.checkpoint && checkpoints.includes(event.detail.checkpoint)) {
+        adjustedRumSamplingRate(event.detail.checkpoint, options, context);
+      }
+    });
+  }
+
+}
+
 export async function loadEager(document, options, context) {
-  context.sampleRUM.always.on('audiences', adjustedRumSamplingRate('audiences', options, context));
-  context.sampleRUM.always.on('campaign', adjustedRumSamplingRate('campaign', options, context));
-  context.sampleRUM.always.on('experiment', adjustedRumSamplingRate('experiment', options, context));
+  adjustRumSampligRate(document, options, context);
   let res = await runCampaign(document, options, context);
   if (!res) {
     res = await runExperiment(document, options, context);
