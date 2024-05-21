@@ -211,7 +211,7 @@ function inferEmptyPercentageSplits(variants) {
   if (variantsWithoutPercentage.length) {
     const missingPercentage = remainingPercentage / variantsWithoutPercentage.length;
     variantsWithoutPercentage.forEach((v) => {
-      v.percentageSplit = missingPercentage.toFixed(2);
+      v.percentageSplit = missingPercentage.toFixed(4);
     });
   }
 }
