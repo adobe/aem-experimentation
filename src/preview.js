@@ -134,7 +134,7 @@ function createToggleButton(label) {
   return button;
 }
 
-const percentformat = new Intl.NumberFormat('en-US', { style: 'percent', maximumSignificantDigits: 2 });
+const percentformat = new Intl.NumberFormat('en-US', { style: 'percent', maximumSignificantDigits: 3 });
 const countformat = new Intl.NumberFormat('en-US', { maximumSignificantDigits: 2 });
 const significanceformat = {
   format: (value) => {
