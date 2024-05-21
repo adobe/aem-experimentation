@@ -265,7 +265,7 @@ function getConfigForInstantExperiment(
     const vname = `challenger-${i + 1}`;
     config.variantNames.push(vname);
     config.variants[vname] = {
-      percentageSplit: `${splits[i].toFixed(2)}`,
+      percentageSplit: `${splits[i].toFixed(4)}`,
       pages: [page],
       blocks: [],
       label: `Challenger ${i + 1}`,
