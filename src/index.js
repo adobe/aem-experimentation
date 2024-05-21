@@ -682,15 +682,18 @@ function adjustedRumSamplingRate(checkpoint, options, context) {
 function adjustRumSampligRate(document, options, context) {
   const checkpoints = ['audiences', 'campaign', 'experiment'];
   if (context.sampleRUM.always) { // RUM v1.x
-    checkpoints.forEach((ck) => context.sampleRUM.always.on(ck, adjustedRumSamplingRate(ck, options, context)));
+    checkpoints.forEach((ck) => {
+      context.sampleRUM.always.on(ck, adjustedRumSamplingRate(ck, options, context));
+    });
   } else { // RUM 2.x
     document.addEventListener('rum', (event) => {
-      if (event.detail && event.detail.checkpoint && checkpoints.includes(event.detail.checkpoint)) {
+      if (event.detail
+        && event.detail.checkpoint
+        && checkpoints.includes(event.detail.checkpoint)) {
         adjustedRumSamplingRate(event.detail.checkpoint, options, context);
       }
     });
   }
-
 }
 
 export async function loadEager(document, options, context) {
@@ -713,9 +716,9 @@ export async function loadLazy(document, options, context) {
   if (window.location.hostname.endsWith('.live')
     || (typeof options.isProd === 'function' && options.isProd())
     || (options.prodHost
-        && (options.prodHost === window.location.host
-          || options.prodHost === window.location.hostname
-          || options.prodHost === window.location.origin))) {
+      && (options.prodHost === window.location.host
+        || options.prodHost === window.location.hostname
+        || options.prodHost === window.location.origin))) {
     return;
   }
   // eslint-disable-next-line import/no-cycle
