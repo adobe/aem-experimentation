@@ -249,7 +249,7 @@ function getConfigForInstantExperiment(
   const splitString = context.getMetadata(`${pluginOptions.experimentsMetaTag}-split`);
   const splits = splitString
     // custom split
-    ? splitString.split(',').map((i) => parseInt(i, 10) / 100)
+    ? splitString.split(',').map((i) => parseFloat(i) / 100)
     // even split fallback
     : [...new Array(pages.length)].map(() => 1 / (pages.length + 1));
 
