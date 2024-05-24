@@ -34,5 +34,6 @@
     "semantic-release": "23.1.1",
     "stylelint": "15.10.3",
     "stylelint-config-standard": "34.0.0"
-  }
+  },
+  "private": true
 }
