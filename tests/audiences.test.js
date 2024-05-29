@@ -114,7 +114,7 @@ test.describe('Section-level audiences', () => {
         type: 'section',
         config: expect.objectContaining({
           configuredAudiences: {
-            foo: '/tests/fixtures/audiences/variant-1',
+            foo: `${await page.evaluate(() => window.location.origin)}/tests/fixtures/audiences/variant-1`,
             bar: '/tests/fixtures/audiences/variant-2',
           },
           resolvedAudiences: ['bar'],
