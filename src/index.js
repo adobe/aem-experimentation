@@ -9,7 +9,6 @@
  * OF ANY KIND, either express or implied. See the License for the specific language
  * governing permissions and limitations under the License.
  */
-const MAX_SAMPLING_RATE = 10; // At a maximum we sample 1 in 10 requests
 
 let isDebugEnabled;
 export function setDebugMode(url, pluginOptions) {
@@ -31,9 +30,6 @@ export function debug(...args) {
 }
 
 export const DEFAULT_OPTIONS = {
-
-  // Generic properties
-  rumSamplingRate: MAX_SAMPLING_RATE, // 1 in 10 requests
 
   // Audiences related properties
   audiences: {},

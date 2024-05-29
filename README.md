@@ -93,6 +93,32 @@ window.aem.plugins.add('experimentation', { // use window.hlx instead of your pr
 });
 ```
 
+### Increasing sampling rate for low traffic pages
+
+When running experiments during short periods (i.e. a few days or 2 weeks) or on low-traffic pages (<100K page views a month), it is unlikely that you'll reach statistical significance on your tests with the default RUM sampling. For those use cases, we recommend adjusting the sampling rate for the pages in question to 1 out of 10 instead of the default 1 out of 100 visits.
+
+Edit your html `<head>` and set configure the RUM sampling like:
+```html
+<meta name="experiment" content="...">
+...
+<!-- insert this script tag before loading aem.js or lib-franklin.js -->
+<script>
+  window.RUM_SAMPLING_RATE = document.head.querySelector('[name^="experiment"],[name^="campaign-"],[name^="audience-"]')
+    || [...document.querySelectorAll('.section-metadata div')].some((d) => d.textContent.match(/Experiment|Campaign|Audience/i))
+    ? 10
+    : 100;
+</script>
+<script type="module" src="/scripts/aem.js"></script>
+<script type="module" src="/scripts/scripts.js"></script>
+```
+
+Then double-check your `aem.js` file around line 20 and look for:
+```js
+const weight = new URLSearchParams(window.location.search).get('rum') === 'on' ? 1 : defaultSamplingRate;
+```
+
+If this is not present, please apply the following changes to the file: https://github.com/adobe/helix-rum-js/pull/159/files#diff-bfe9874d239014961b1ae4e89875a6155667db834a410aaaa2ebe3cf89820556
+
 ### Custom options
 
 There are various aspects of the plugin that you can configure via options you are passing to the 2 main methods above (`runEager`/`runLazy`).
@@ -106,12 +132,6 @@ runEager.call(document, {
   // if you have several, or need more complex logic to toggle pill overlay, you can use
   isProd: () => !window.location.hostname.endsWith('hlx.page')
     && window.location.hostname !== ('localhost'),
-  
-  // RUM sampling rate on regular AEM pages is 1 out of 100 page views
-  // but we increase this by default for audiences, campaigns and experiments
-  // to 1 out of 10 page views so we can collect metrics faster of the relative
-  // short durations of those campaigns/experiments
-  rumSamplingRate: 10,
 
   // the storage type used to persist data between page views
   // (for instance to remember what variant in an experiment the user was served)
