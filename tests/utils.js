@@ -24,7 +24,11 @@ export async function goToAndRunExperiment(page, url) {
 }
 
 export async function waitForDomEvent(page, eventName) {
-  return page.evaluate((name) => new Promise((resolve) => {
-    document.addEventListener(name, (ev) => resolve(ev.detail));
-  }), eventName);
+  await page.addInitScript((name) => {
+    // Override the prototype
+    window.eventPromise = new Promise((resolve) => {
+      document.addEventListener(name, (ev) => resolve(ev.detail));
+    });
+  }, eventName);
+  return async () => await window.eventPromise;
 }

@@ -84,8 +84,9 @@ test.describe('Page-level audiences', () => {
   });
 
   test('triggers a DOM event with the audience detail', async ({ page }) => {
+    const fn = await waitForDomEvent(page, 'aem:experimentation');
     await page.goto('/tests/fixtures/audiences/page-level');
-    expect(await waitForDomEvent(page, 'aem:experimentation')).toEqual({
+    expect(await page.evaluate(fn)).toEqual({
       type: 'audience',
       element: await page.evaluate(() => document.body),
       audience: 'foo',
@@ -125,8 +126,9 @@ test.describe('Section-level audiences', () => {
   });
 
   test('triggers a DOM event with the audience detail', async ({ page }) => {
+    const fn = await waitForDomEvent(page, 'aem:experimentation');
     await page.goto('/tests/fixtures/audiences/section-level');
-    expect(await waitForDomEvent(page, 'aem:experimentation')).toEqual({
+    expect(await page.evaluate(fn)).toEqual({
       type: 'audience',
       element: await page.evaluate(() => document.querySelector('.section')),
       audience: 'bar',
@@ -181,8 +183,9 @@ test.describe('Fragment-level audiences', () => {
   });
 
   test('triggers a DOM event with the audience detail', async ({ page }) => {
+    const fn = await waitForDomEvent(page, 'aem:experimentation');
     await page.goto('/tests/fixtures/audiences/fragment-level');
-    expect(await waitForDomEvent(page, 'aem:experimentation')).toEqual({
+    expect(await page.evaluate(fn)).toEqual({
       type: 'audience',
       element: await page.evaluate(() => document.querySelector('.fragment')),
       audience: 'foo',

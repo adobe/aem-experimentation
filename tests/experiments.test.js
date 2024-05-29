@@ -155,8 +155,9 @@ test.describe('Page-level experiments', () => {
   });
 
   test('triggers a DOM event with the experiment detail', async ({ page }) => {
+    const fn = await waitForDomEvent(page, 'aem:experimentation');
     await page.goto('/tests/fixtures/experiments/page-level?experiment=foo&experiment-variant=challenger-1');
-    expect(await waitForDomEvent(page, 'aem:experimentation')).toEqual({
+    expect(await page.evaluate(fn)).toEqual({
       type: 'experiment',
       element: await page.evaluate(() => document.body),
       experiment: 'foo',
@@ -211,8 +212,9 @@ test.describe('Section-level experiments', () => {
   });
 
   test('triggers a DOM event with the experiment detail', async ({ page }) => {
+    const fn = await waitForDomEvent(page, 'aem:experimentation');
     await page.goto('/tests/fixtures/experiments/section-level?experiment=bar/challenger-2');
-    expect(await waitForDomEvent(page, 'aem:experimentation')).toEqual({
+    expect(await page.evaluate(fn)).toEqual({
       type: 'experiment',
       element: await page.evaluate(() => document.querySelector('.section')),
       experiment: 'bar',
@@ -292,8 +294,9 @@ test.describe('Fragment-level experiments', () => {
   });
 
   test('triggers a DOM event with the experiment detail', async ({ page }) => {
+    const fn = await waitForDomEvent(page, 'aem:experimentation');
     await page.goto('/tests/fixtures/experiments/fragment-level?experiment=baz/challenger-1');
-    expect(await waitForDomEvent(page, 'aem:experimentation')).toEqual({
+    expect(await page.evaluate(fn)).toEqual({
       type: 'experiment',
       element: await page.evaluate(() => document.querySelector('.fragment')),
       experiment: 'baz',

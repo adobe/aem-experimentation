@@ -93,8 +93,9 @@ test.describe('Page-level campaigns', () => {
   });
 
   test('triggers a DOM event with the campaign detail', async ({ page }) => {
+    const fn = await waitForDomEvent(page, 'aem:experimentation');
     await page.goto('/tests/fixtures/campaigns/page-level?campaign=bar');
-    expect(await waitForDomEvent(page, 'aem:experimentation')).toEqual({
+    expect(await page.evaluate(fn)).toEqual({
       type: 'campaign',
       element: await page.evaluate(() => document.body),
       campaign: 'bar',
@@ -133,8 +134,9 @@ test.describe('Section-level campaigns', () => {
   });
 
   test('triggers a DOM event with the campaign detail', async ({ page }) => {
+    const fn = await waitForDomEvent(page, 'aem:experimentation');
     await page.goto('/tests/fixtures/campaigns/section-level?campaign=bar');
-    expect(await waitForDomEvent(page, 'aem:experimentation')).toEqual({
+    expect(await page.evaluate(fn)).toEqual({
       type: 'campaign',
       element: await page.evaluate(() => document.querySelector('.section')),
       campaign: 'bar',
@@ -183,8 +185,9 @@ test.describe('Fragment-level campaigns', () => {
   });
 
   test('triggers a DOM event with the campaign detail', async ({ page }) => {
+    const fn = await waitForDomEvent(page, 'aem:experimentation');
     await page.goto('/tests/fixtures/campaigns/fragment-level?campaign=foo');
-    expect(await waitForDomEvent(page, 'aem:experimentation')).toEqual({
+    expect(await page.evaluate(fn)).toEqual({
       type: 'campaign',
       element: await page.evaluate(() => document.querySelector('.fragment')),
       campaign: 'foo',
