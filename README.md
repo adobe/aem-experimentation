@@ -139,6 +139,6 @@ runEager.call(document, {
 ```
 
 For detailed implementation instructions on the different features, please read the dedicated pages we have on those topics:
-- [Audiences](./v2/documentation/audiences)
-- [Campaigns](./v2/documentation/campaigns)
-- [Experiments](./v2/documentation/experiments)
+- [Audiences](/adobe/aem-experimentation/blob/v2/documentation/audiences)
+- [Campaigns](/adobe/aem-experimentation/blob/v2/documentation/campaigns)
+- [Experiments](/adobe/aem-experimentation/blob/v2/documentation/experiments)
