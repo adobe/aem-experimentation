@@ -40,6 +40,17 @@ class AemExperimentationBar extends HTMLElement {
 }
 customElements.define('aem-experimentation-bar', AemExperimentationBar);
 
+function watchForAddExperiences(ns, cb) {
+  let { length } = ns;
+  window.setInterval(() => {
+    if (length !== ns.length) {
+      const diff = length - ns.length;
+      length = ns.length;
+      ns.slice(diff).map((c) => cb(c));
+    }
+  }, 1000);
+}
+
 function createPreviewOverlay() {
   const overlay = document.createElement('aem-experimentation-bar');
   return overlay;
@@ -432,6 +443,7 @@ async function decorateExperimentPills(container, options) {
     return null;
   }
 
+  watchForAddExperiences(ns.experiments, (c) => decorateExperimentPill(c, container, options));
   return Promise.all(ns.experiments.map((c) => decorateExperimentPill(c, container, options)));
 }
 
@@ -501,6 +513,7 @@ async function decorateCampaignPills(container, options) {
     return null;
   }
 
+  watchForAddExperiences(ns.campaigns, (c) => decorateCampaignPill(c, container, options));
   return Promise.all(ns.campaigns.map((c) => decorateCampaignPill(c, container, options)));
 }
 
@@ -565,6 +578,7 @@ async function decorateAudiencesPills(container, options) {
     return null;
   }
 
+  watchForAddExperiences(ns.audiences, (c) => decorateAudiencesPill(c, container, options));
   return Promise.all(ns.audiences.map((c) => decorateAudiencesPill(c, container, options)));
 }
 
