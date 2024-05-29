@@ -103,30 +103,18 @@ You have already seen the `audiences` option in the examples above, but here is 
 
 ```js
 runEager.call(document, {
-  // Overrides the base path if the plugin was installed in a sub-directory
-  basePath: '',
-
   // Lets you configure the prod environment.
   // (prod environments do not get the pill overlay)
   prodHost: 'www.my-website.com',
   // if you have several, or need more complex logic to toggle pill overlay, you can use
-  isProd: () => window.location.hostname.endsWith('hlx.page')
-    || window.location.hostname === ('localhost'),
-
-  /* Generic properties */
-  // The callback to call when an experiment, audiance or campaign was applied
-  // so that you can decorate the container for the variant as required
-  decorationCallback: (el) => {},
+  isProd: () => !window.location.hostname.endsWith('hlx.page')
+    && window.location.hostname !== ('localhost'),
   
   // RUM sampling rate on regular AEM pages is 1 out of 100 page views
   // but we increase this by default for audiences, campaigns and experiments
   // to 1 out of 10 page views so we can collect metrics faster of the relative
   // short durations of those campaigns/experiments
   rumSamplingRate: 10,
-
-  // The tracking function to call so you can gather your metrics.
-  // This defaults to `window.hlx.rum.sampleRUM`.
-  trackingFunction: (checkpoint, { source, target }) => {},
 
   // the storage type used to persist data between page views
   // (for instance to remember what variant in an experiment the user was served)
