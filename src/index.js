@@ -12,13 +12,14 @@
 const MAX_SAMPLING_RATE = 10; // At a maximum we sample 1 in 10 requests
 
 let isDebugEnabled;
-export function setDebugMode(pluginOptions) {
-  const { host, hostname, origin } = window.location;
+export function setDebugMode(url, pluginOptions) {
+  const { host, hostname, origin } = url;
   const { isProd, prodHost } = pluginOptions;
-  isDebugEnabled = (window.location.hostname === 'localhost'
-    || window.location.hostname.endsWith('.page')
+  isDebugEnabled = (url.hostname === 'localhost'
+    || url.hostname.endsWith('.page')
     || (typeof isProd === 'function' && !isProd())
-    || (prodHost && ![host, hostname, origin].includes(prodHost)));
+    || (prodHost && ![host, hostname, origin].includes(prodHost))
+    || false);
   return isDebugEnabled;
 }
 
@@ -32,9 +33,7 @@ export function debug(...args) {
 export const DEFAULT_OPTIONS = {
 
   // Generic properties
-  decorationCallback: () => {},
   rumSamplingRate: MAX_SAMPLING_RATE, // 1 in 10 requests
-  trackingFunction: window.hlx?.rum?.sampleRUM,
 
   // Audiences related properties
   audiences: {},
@@ -88,8 +87,7 @@ export function toCamelCase(name) {
  * @returns {String} The metadata value(s)
  */
 export function getMetadata(name) {
-  const attr = name && name.includes(':') ? 'property' : 'name';
-  const meta = [...document.head.querySelectorAll(`meta[${attr}="${name}"]`)].map((m) => m.content).join(', ');
+  const meta = [...document.head.querySelectorAll(`meta[name="${name}"]`)].map((m) => m.content).join(', ');
   return meta || '';
 }
 
@@ -100,11 +98,9 @@ export function getMetadata(name) {
  */
 export function getAllMetadata(scope) {
   const value = getMetadata(scope);
-  return [...document.head.querySelectorAll(`meta[property^="${scope}:"],meta[name^="${scope}-"]`)]
+  return [...document.head.querySelectorAll(`meta[name^="${scope}-"]`)]
     .reduce((res, meta) => {
-      const key = toCamelCase(meta.name
-        ? meta.name.substring(scope.length + 1)
-        : meta.getAttribute('property').split(':')[1]);
+      const key = toCamelCase(meta.name.substring(scope.length + 1));
       res[key] = meta.getAttribute('content');
       return res;
     }, value ? { value } : {});
@@ -115,6 +111,7 @@ export function getAllMetadata(scope) {
  * @param {String} scope The scope/prefix for the metadata
  * @returns a map of key/value pairs for the given scope
  */
+// eslint-disable-next-line no-unused-vars
 function getAllDataAttributes(el, scope) {
   return el.getAttributeNames()
     .filter((attr) => attr === `data-${scope}` || attr.startsWith(`data-${scope}-`))
@@ -339,6 +336,22 @@ function createModificationsHandler(
 }
 
 /**
+ * Rename plural properties on the object to singular.
+ * @param {Object} obj The object
+ * @param {String[]} props The properties to rename.
+ * @returns the object with plural properties renamed.
+ */
+function depluralizeProps(obj, props = []) {
+  props.forEach((prop) => {
+    if (obj[`${prop}s`]) {
+      obj[prop] = obj[`${prop}s`];
+      delete obj[`${prop}s`];
+    }
+  });
+  return obj;
+}
+
+/**
  * Fetch the configuration entries from a JSON manifest.
  * @param {String} urlString the URL to load
  * @returns the list of entries that apply to the current page
@@ -353,9 +366,12 @@ async function getManifestEntriesForCurrentPage(urlString) {
         res[k.toLowerCase()] = entry[k];
         return res;
       }, {}))
-      .filter((entry) => !entry.page || entry.page === window.location.pathname)
-      .filter((entry) => entry.selector)
-      .filter((entry) => entry.url);
+      .filter((entry) => (!entry.page && !entry.pages)
+        || entry.page === window.location.pathname
+        || entry.pages === window.location.pathname)
+      .filter((entry) => entry.selector || entry.selectors)
+      .filter((entry) => entry.url || entry.urls)
+      .map((entry) => depluralizeProps(entry, ['page', 'selector', 'url']));
   } catch (err) {
     // eslint-disable-next-line no-console
     console.warn('Cannot apply manifest: ', urlString, err);
@@ -394,7 +410,7 @@ function watchMutationsAndApplyFragments(
         return;
       }
       entry.isApplied = true;
-      const fragmentNS = { config, el };
+      const fragmentNS = { config, el, type: 'fragment' };
       // eslint-disable-next-line no-await-in-loop
       const url = await getExperienceUrl(fragmentNS.config);
       let res;
@@ -430,7 +446,7 @@ function watchMutationsAndApplyFragments(
  * @returns an object containing the details of the page modifications that where applied
  */
 async function applyAllModifications(
-  ns,
+  type,
   paramNS,
   pluginOptions,
   metadataToConfig,
@@ -446,50 +462,55 @@ async function applyAllModifications(
     cb,
   );
 
-  const fragmentsNS = [];
+  const configs = [];
 
   // Full-page modifications
-  const pageMetadata = getAllMetadata(ns);
+  const pageMetadata = getAllMetadata(type);
   const pageNS = await modificationsHandler(
     document.querySelector('main'),
     pageMetadata,
   );
   if (pageNS) {
-    debug('page', ns, pageNS);
+    pageNS.type = 'page';
+    configs.push(pageNS);
+    debug('page', type, pageNS);
   }
 
   // Section-level modifications
   let sectionMetadata;
-  const sectionsNS = [];
   await Promise.all([...document.querySelectorAll('.section-metadata')]
     .map(async (sm) => {
-      sectionMetadata = getAllSectionMeta(sm, ns);
+      sectionMetadata = getAllSectionMeta(sm, type);
       const sectionNS = await modificationsHandler(
         sm.parentElement,
         sectionMetadata,
       );
       if (sectionNS) {
-        debug('section', ns, sectionNS);
-        sectionsNS.push(sectionNS);
+        sectionNS.type = 'section';
+        debug('section', type, sectionNS);
+        configs.push(sectionNS);
       }
     }));
 
   if (pageMetadata.manifest) {
-    const entries = manifestToConfig(await getManifestEntriesForCurrentPage(pageMetadata.manifest));
-    watchMutationsAndApplyFragments(
-      ns,
-      document.body,
-      entries,
-      fragmentsNS,
-      getExperienceUrl,
-      pluginOptions,
-      metadataToConfig,
-      getAllQueryParameters(paramNS),
-      cb,
-    );
+    let entries = await getManifestEntriesForCurrentPage(pageMetadata.manifest);
+    if (entries) {
+      entries = manifestToConfig(entries);
+      watchMutationsAndApplyFragments(
+        type,
+        document.body,
+        entries,
+        configs,
+        getExperienceUrl,
+        pluginOptions,
+        metadataToConfig,
+        getAllQueryParameters(paramNS),
+        cb,
+      );
+    }
   }
 
-  return { page: pageNS, sections: sectionsNS, fragments: fragmentsNS };
+  return configs;
 }
 
 function aggregateEntries(type, allowedMultiValuesProperties) {
@@ -498,7 +519,7 @@ function aggregateEntries(type, allowedMultiValuesProperties) {
       if (!aggregator[key]) {
         aggregator[key] = value;
       } else if (aggregator[key] !== value) {
-        if (allowedMultiValuesProperties.test(key)) {
+        if (allowedMultiValuesProperties.includes(key)) {
           aggregator[key] = [].concat(aggregator[key], value);
         } else {
           // eslint-disable-next-line no-console
@@ -624,8 +645,10 @@ async function getExperimentConfig(pluginOptions, metadata, overrides) {
  * Parses the campaign manifest.
  */
 function parseExperimentManifest(entries) {
-  return Object.values(Object.groupBy(entries, ({ experiment }) => experiment))
-    .map(aggregateEntries('experiment', /(splits?|urls?|variants?)/));
+  return Object.values(Object.groupBy(
+    entries.map((e) => depluralizeProps(e, ['experiment', 'variant', 'split'])),
+    ({ experiment }) => experiment,
+  )).map(aggregateEntries('experiment', ['split', 'url', 'variant']));
 }
 
 function getUrlFromExperimentConfig(config) {
@@ -644,15 +667,21 @@ async function runExperiment(document, pluginOptions) {
     getUrlFromExperimentConfig,
     (el, config, result) => {
       const { id, selectedVariant, variantNames } = config;
+      const variant = result ? selectedVariant : variantNames[0];
       el.classList.add(`experiment-${toClassName(id)}`);
-      el.classList.add(`variant-${toClassName(result ? selectedVariant : variantNames[0])}`);
-      if (pluginOptions.trackingFunction) {
-        pluginOptions.trackingFunction('experiment', {
-          source: id,
-          target: result ? selectedVariant : variantNames[0],
-        });
-      }
-      pluginOptions.decorationCallback(el);
+      el.classList.add(`variant-${toClassName(variant)}`);
+      window.hlx?.rum?.sampleRUM('experiment', {
+        source: id,
+        target: variant,
+      });
+      document.dispatchEvent(new CustomEvent('aem:experimentation', {
+        detail: {
+          element: el,
+          type: 'experiment',
+          experiment: id,
+          variant,
+        },
+      }));
     },
   );
 }
@@ -661,7 +690,7 @@ async function runExperiment(document, pluginOptions) {
  * Parses the campaign configuration from the metadata
  */
 async function getCampaignConfig(pluginOptions, metadata, overrides) {
-  if (!Object.keys(metadata).length) {
+  if (!Object.keys(metadata).length || (Object.keys(metadata).length === 1 && metadata.manifest)) {
     return null;
   }
 
@@ -706,17 +735,19 @@ async function getCampaignConfig(pluginOptions, metadata, overrides) {
  * Parses the campaign manifest.
  */
 function parseCampaignManifest(entries) {
-  return Object.values(Object.groupBy(entries, ({ selector }) => selector))
-    .map(aggregateEntries('campaign', /(campaigns?|urls?)/))
+  return Object.values(Object.groupBy(
+    entries.map((e) => depluralizeProps(e, ['campaign'])),
+    ({ selector }) => selector,
+  ))
+    .map(aggregateEntries('campaign', ['campaign', 'url']))
     .map((e) => {
-      const campaigns = (e.campaign || e.campaigns);
+      const campaigns = e.campaign;
       delete e.campaign;
       e.campaigns = {};
       campaigns.forEach((a, i) => {
-        e.campaigns[toClassName(a)] = e.url[i] || e.urls[i];
+        e.campaigns[toClassName(a)] = e.url[i];
       });
       delete e.url;
-      delete e.urls;
       return e;
     });
 }
@@ -737,14 +768,19 @@ async function runCampaign(document, pluginOptions) {
     getUrlFromCampaignConfig,
     (el, config, result) => {
       const { selectedCampaign = 'default' } = config;
-      el.classList.add(`campaign-${result ? toClassName(selectedCampaign) : 'default'}`);
-      if (pluginOptions.trackingFunction) {
-        pluginOptions.trackingFunction('campaign', {
-          source: el.className,
-          target: result ? selectedCampaign : 'default',
-        });
-      }
-      pluginOptions.decorationCallback(el);
+      const campaign = result ? toClassName(selectedCampaign) : 'default';
+      el.classList.add(`campaign-${campaign}`);
+      window.hlx?.rum?.sampleRUM('campaign', {
+        source: el.className,
+        target: campaign,
+      });
+      document.dispatchEvent(new CustomEvent('aem:experimentation', {
+        detail: {
+          element: el,
+          type: 'campaign',
+          campaign,
+        },
+      }));
     },
   );
 }
@@ -753,7 +789,7 @@ async function runCampaign(document, pluginOptions) {
  * Parses the audience configuration from the metadata
  */
 async function getAudienceConfig(pluginOptions, metadata, overrides) {
-  if (!Object.keys(metadata).length) {
+  if (!Object.keys(metadata).length || (Object.keys(metadata).length === 1 && metadata.manifest)) {
     return null;
   }
 
@@ -779,17 +815,19 @@ async function getAudienceConfig(pluginOptions, metadata, overrides) {
  * Parses the audience manifest.
  */
 function parseAudienceManifest(entries) {
-  return Object.values(Object.groupBy(entries, ({ selector }) => selector))
-    .map(aggregateEntries('audience', /(audiences?|urls?)/))
+  return Object.values(Object.groupBy(
+    entries.map((e) => depluralizeProps(e, ['audience'])),
+    ({ selector }) => selector,
+  ))
+    .map(aggregateEntries('audience', ['audience', 'url']))
     .map((e) => {
-      const audiences = (e.audience || e.audiences);
+      const audiences = e.audience;
       delete e.audience;
       e.audiences = {};
       audiences.forEach((a, i) => {
-        e.audiences[toClassName(a)] = e.url[i] || e.urls[i];
+        e.audiences[toClassName(a)] = e.url[i];
       });
       delete e.url;
-      delete e.urls;
       return e;
     });
 }
@@ -810,14 +848,19 @@ async function serveAudience(document, pluginOptions) {
     getUrlFromAudienceConfig,
     (el, config, result) => {
       const { selectedAudience = 'default' } = config;
-      el.classList.add(`audience-${result ? toClassName(selectedAudience) : 'default'}`);
-      if (pluginOptions.trackingFunction) {
-        pluginOptions.trackingFunction('audience', {
-          source: el.className,
-          target: result ? selectedAudience : 'default',
-        });
-      }
-      pluginOptions.decorationCallback(el);
+      const audience = result ? toClassName(selectedAudience) : 'default';
+      el.classList.add(`audience-${audience}`);
+      window.hlx?.rum?.sampleRUM('audience', {
+        source: el.className,
+        target: audience,
+      });
+      document.dispatchEvent(new CustomEvent('aem:experimentation', {
+        detail: {
+          element: el,
+          type: 'audience',
+          audience,
+        },
+      }));
     },
   );
 }
@@ -845,9 +888,9 @@ function adjustRumSampligRateInternal(checkpoint, options) {
 
 function adjustRumSampligRate(document, options) {
   const checkpoints = ['experiment'];
-  if (options.trackingFunction?.always) { // RUM v1.x
+  if (window.hlx?.rum?.sampleRUM?.always) { // RUM v1.x
     checkpoints.forEach((ck) => {
-      options.trackingFunction?.always.on(ck, adjustRumSampligRateInternal(ck, options));
+      window.hlx.rum.sampleRUM.always.on(ck, adjustRumSampligRateInternal(ck, options));
     });
   } else { // RUM 2.x
     document.addEventListener('rum', (event) => {
@@ -860,7 +903,7 @@ function adjustRumSampligRate(document, options) {
 
 export async function loadEager(document, options = {}) {
   const pluginOptions = { ...DEFAULT_OPTIONS, ...options };
-  setDebugMode(pluginOptions);
+  setDebugMode(window.location, pluginOptions);
 
   adjustRumSampligRate(document, pluginOptions);
 
@@ -870,23 +913,9 @@ export async function loadEager(document, options = {}) {
   ns.campaigns = await runCampaign(document, pluginOptions);
 
   // Backward compatibility
-  ns.experiment = ns.experiments?.page?.config
-    ? {
-      ...ns.experiments.page.config,
-      ...(ns.experiments.page.servedExperience
-        ? { servedExperience: ns.experiments.page.servedExperience }
-        : {}),
-    }
-    : null;
-  ns.audience = ns.audiences?.page?.config
-    ? {
-      audiences: ns.audiences.page.config.configuredAudiences,
-      selectedAudience: ns.audiences.page.config.serveAudience,
-      ...(ns.audiences.page.servedExperience
-        ? { servedExperience: ns.audiences.page.servedExperience }
-        : {}),
-    }
-    : null;
+  ns.experiment = ns.experiments.find((e) => e.type === 'page');
+  ns.audience = ns.audiences.find((e) => e.type === 'page');
+  ns.campaign = ns.campaigns.find((e) => e.type === 'page');
 }
 
 export async function loadLazy(document, options = {}) {

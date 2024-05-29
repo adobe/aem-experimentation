@@ -432,13 +432,7 @@ async function decorateExperimentPills(container, options) {
     return null;
   }
 
-  const configs = [].concat(
-    ns.experiments.page ? [ns.experiments.page] : [],
-    ns.experiments.sections,
-    ns.experiments.fragments,
-  );
-
-  return Promise.all(configs.map((c) => decorateExperimentPill(c, container, options)));
+  return Promise.all(ns.experiments.map((c) => decorateExperimentPill(c, container, options)));
 }
 
 function createCampaign(campaign, isSelected, options) {
@@ -507,13 +501,7 @@ async function decorateCampaignPills(container, options) {
     return null;
   }
 
-  const configs = [].concat(
-    ns.campaigns.page ? [ns.campaigns.page] : [],
-    ns.campaigns.sections,
-    ns.campaigns.fragments,
-  );
-
-  return Promise.all(configs.map((c) => decorateCampaignPill(c, container, options)));
+  return Promise.all(ns.campaigns.map((c) => decorateCampaignPill(c, container, options)));
 }
 
 function createAudience(audience, isSelected, options) {
@@ -577,13 +565,7 @@ async function decorateAudiencesPills(container, options) {
     return null;
   }
 
-  const configs = [].concat(
-    ns.audiences.page ? [ns.audiences.page] : [],
-    ns.audiences.sections,
-    ns.audiences.fragments,
-  );
-
-  return Promise.all(configs.map((c) => decorateAudiencesPill(c, container, options)));
+  return Promise.all(ns.audiences.map((c) => decorateAudiencesPill(c, container, options)));
 }
 
 /**
