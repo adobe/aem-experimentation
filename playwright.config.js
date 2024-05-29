@@ -41,7 +41,7 @@ export default defineConfig({
     },
   ],
 
-  timeout: process.env.CI ? 10000 : 30000,
+  timeout: 10000,
 
   // Run your local dev server before starting the tests
   webServer: {
