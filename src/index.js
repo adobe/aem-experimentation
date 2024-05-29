@@ -865,47 +865,9 @@ async function serveAudience(document, pluginOptions) {
   );
 }
 
-let isAdjusted = false;
-function adjustRumSampligRateInternal(checkpoint, options) {
-  return (data) => {
-    if (!window.hlx.rum.isSelected && !isAdjusted) {
-      isAdjusted = true;
-      // adjust sampling rate based on project config …
-      window.hlx.rum.weight = Math.min(
-        window.hlx.rum.weight,
-        // … but limit it to the 10% sampling at max to avoid losing anonymization
-        // and reduce burden on the backend
-        Math.max(options.rumSamplingRate, MAX_SAMPLING_RATE),
-      );
-      window.hlx.rum.isSelected = (window.hlx.rum.random * window.hlx.rum.weight < 1);
-      if (window.hlx.rum.isSelected) {
-        window.hlx.rum.sampleRUM(checkpoint, data);
-      }
-    }
-    return true;
-  };
-}
-
-function adjustRumSampligRate(document, options) {
-  const checkpoints = ['experiment'];
-  if (window.hlx?.rum?.sampleRUM?.always) { // RUM v1.x
-    checkpoints.forEach((ck) => {
-      window.hlx.rum.sampleRUM.always.on(ck, adjustRumSampligRateInternal(ck, options));
-    });
-  } else { // RUM 2.x
-    document.addEventListener('rum', (event) => {
-      if (event.detail?.checkpoint && checkpoints.includes(event.detail.checkpoint)) {
-        adjustRumSampligRateInternal(event.detail.checkpoint, options);
-      }
-    });
-  }
-}
-
 export async function loadEager(document, options = {}) {
   const pluginOptions = { ...DEFAULT_OPTIONS, ...options };
   setDebugMode(window.location, pluginOptions);
-
-  adjustRumSampligRate(document, pluginOptions);
 
   const ns = window.aem || window.hlx || {};
   ns.audiences = await serveAudience(document, pluginOptions);
