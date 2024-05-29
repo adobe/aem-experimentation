@@ -181,6 +181,6 @@ runEager.call(document, {
 ```
 
 For detailed implementation instructions on the different features, please read the dedicated pages we have on those topics:
-- [Audiences](https://github.com/adobe/aem-experimentation/wiki/Audiences)
-- [Campaigns](https://github.com/adobe/aem-experimentation/wiki/Campaigns)
-- [Experiments](https://github.com/adobe/aem-experimentation/wiki/Experiments)
+- [Audiences](/adobe/aem-experimentation/blob/v1/documentation/audiences.md)
+- [Campaigns](/adobe/aem-experimentation/blob/v1/documentation/campaigns.md)
+- [Experiments](/adobe/aem-experimentation/blob/v1/documentation/experiments.md)
