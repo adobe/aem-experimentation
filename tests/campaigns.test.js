@@ -1,7 +1,7 @@
 /* eslint-disable import/no-extraneous-dependencies */
 import { test, expect } from '@playwright/test';
 import { track } from './coverage.js';
-import { goToAndRunCampaign } from './utils.js';
+import { goToAndRunCampaign, waitForDomEvent } from './utils.js';
 
 track(test);
 
@@ -74,6 +74,32 @@ test.describe('Page-level campaigns', () => {
       }),
     ]);
   });
+
+  test('Exposes the campaign in a JS API.', async ({ page }) => {
+    await goToAndRunCampaign(page, '/tests/fixtures/campaigns/page-level?campaign=bar');
+    expect(await page.evaluate(() => window.hlx.campaigns)).toContainEqual(
+      expect.objectContaining({
+        type: 'page',
+        config: expect.objectContaining({
+          configuredCampaigns: {
+            foo: '/tests/fixtures/campaigns/variant-1',
+            bar: '/tests/fixtures/campaigns/variant-2',
+          },
+          selectedCampaign: 'bar',
+        }),
+        servedExperience: '/tests/fixtures/campaigns/variant-2',
+      }),
+    );
+  });
+
+  test('triggers a DOM event with the campaign detail', async ({ page }) => {
+    await page.goto('/tests/fixtures/campaigns/page-level?campaign=bar');
+    expect(await waitForDomEvent(page, 'aem:experimentation')).toEqual({
+      type: 'campaign',
+      element: await page.evaluate(() => document.body),
+      campaign: 'bar',
+    });
+  });
 });
 
 test.describe('Section-level campaigns', () => {
@@ -91,8 +117,9 @@ test.describe('Section-level campaigns', () => {
 
   test('Exposes the campaigns in a JS API.', async ({ page }) => {
     await goToAndRunCampaign(page, '/tests/fixtures/campaigns/section-level?campaign=bar');
-    expect(await page.evaluate(() => window.hlx.campaigns.sections)).toContainEqual(
+    expect(await page.evaluate(() => window.hlx.campaigns)).toContainEqual(
       expect.objectContaining({
+        type: 'section',
         config: expect.objectContaining({
           configuredCampaigns: {
             foo: '/tests/fixtures/campaigns/variant-1',
@@ -104,12 +131,31 @@ test.describe('Section-level campaigns', () => {
       }),
     );
   });
+
+  test('triggers a DOM event with the campaign detail', async ({ page }) => {
+    await page.goto('/tests/fixtures/campaigns/section-level?campaign=bar');
+    expect(await waitForDomEvent(page, 'aem:experimentation')).toEqual({
+      type: 'campaign',
+      element: await page.evaluate(() => document.querySelector('.section')),
+      campaign: 'bar',
+    });
+  });
 });
 
 test.describe('Fragment-level campaigns', () => {
   test('Replaces the fragment content with the variant.', async ({ page }) => {
     await goToAndRunCampaign(page, '/tests/fixtures/campaigns/fragment-level?campaign=foo');
     expect(await page.locator('.fragment').textContent()).toContain('Hello v1!');
+  });
+
+  test('Supports plural format for manifest keys.', async ({ page }) => {
+    await goToAndRunCampaign(page, '/tests/fixtures/campaigns/fragment-level--alt?campaign=foo');
+    expect(await page.locator('.fragment').textContent()).toContain('Hello v1!');
+  });
+
+  test('Ignores invalid manifest url.', async ({ page }) => {
+    await goToAndRunCampaign(page, '/tests/fixtures/campaigns/fragment-level--invalid-url?campaign=foo');
+    expect(await page.locator('.fragment').textContent()).toContain('Hello World!');
   });
 
   test('Sets classes on the section for the campaign.', async ({ page }) => {
@@ -121,8 +167,9 @@ test.describe('Fragment-level campaigns', () => {
 
   test('Exposes the campaigns in a JS API.', async ({ page }) => {
     await goToAndRunCampaign(page, '/tests/fixtures/campaigns/fragment-level?campaign=foo');
-    expect(await page.evaluate(() => window.hlx.campaigns.fragments)).toContainEqual(
+    expect(await page.evaluate(() => window.hlx.campaigns)).toContainEqual(
       expect.objectContaining({
+        type: 'fragment',
         config: expect.objectContaining({
           configuredCampaigns: {
             foo: '/tests/fixtures/campaigns/variant-1',
@@ -133,6 +180,15 @@ test.describe('Fragment-level campaigns', () => {
         servedExperience: '/tests/fixtures/campaigns/variant-1',
       }),
     );
+  });
+
+  test('triggers a DOM event with the campaign detail', async ({ page }) => {
+    await page.goto('/tests/fixtures/campaigns/fragment-level?campaign=foo');
+    expect(await waitForDomEvent(page, 'aem:experimentation')).toEqual({
+      type: 'campaign',
+      element: await page.evaluate(() => document.querySelector('.fragment')),
+      campaign: 'foo',
+    });
   });
 });
 

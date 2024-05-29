@@ -1,7 +1,7 @@
 /* eslint-disable import/no-extraneous-dependencies */
 import { test, expect } from '@playwright/test';
 import { track } from './coverage.js';
-import { goToAndRunExperiment } from './utils.js';
+import { goToAndRunExperiment, waitForDomEvent } from './utils.js';
 
 track(test);
 
@@ -119,20 +119,23 @@ test.describe('Page-level experiments', () => {
 
   test('Exposes the experiment in a JS API.', async ({ page }) => {
     await goToAndRunExperiment(page, '/tests/fixtures/experiments/page-level');
-    expect(await page.evaluate(() => window.hlx.experiments.page)).toEqual(expect.objectContaining({
-      config: expect.objectContaining({
-        id: 'foo',
-        run: true,
-        selectedVariant: expect.stringMatching(/control|challenger-1|challenger-2/),
-        status: 'active',
-        variants: {
-          control: expect.objectContaining({ percentageSplit: '0.3334' }),
-          'challenger-1': expect.objectContaining({ percentageSplit: '0.3333' }),
-          'challenger-2': expect.objectContaining({ percentageSplit: '0.3333' }),
-        },
+    expect(await page.evaluate(() => window.hlx.experiments)).toContainEqual(
+      expect.objectContaining({
+        type: 'page',
+        config: expect.objectContaining({
+          id: 'foo',
+          run: true,
+          selectedVariant: expect.stringMatching(/control|challenger-1|challenger-2/),
+          status: 'active',
+          variants: {
+            control: expect.objectContaining({ percentageSplit: '0.3334' }),
+            'challenger-1': expect.objectContaining({ percentageSplit: '0.3333' }),
+            'challenger-2': expect.objectContaining({ percentageSplit: '0.3333' }),
+          },
+        }),
+        servedExperience: expect.stringContaining('/tests/fixtures/experiments/page-level'),
       }),
-      servedExperience: expect.stringContaining('/tests/fixtures/experiments/page-level'),
-    }));
+    );
   });
 
   test('Controls the variant shown via query parameters.', async ({ page }) => {
@@ -140,15 +143,25 @@ test.describe('Page-level experiments', () => {
     expect(await page.locator('main').textContent()).toEqual('Hello World!');
     await goToAndRunExperiment(page, '/tests/fixtures/experiments/page-level?experiment=foo/challenger-1');
     expect(await page.locator('main').textContent()).toEqual('Hello v1!');
-    await goToAndRunExperiment(page, '/tests/fixtures/experiments/page-level?experiment=bar/challenger-1&experiment=foo/challenger-2');
-    expect(await page.locator('main').textContent()).toEqual('Hello v2!');
   });
 
   test('supports overriding the shown experiment and variant via query parameters.', async ({ page }) => {
+    await goToAndRunExperiment(page, '/tests/fixtures/experiments/page-level?experiment=foo/challenger-2&experiment=bar/challenger-1');
+    expect(await page.locator('main').textContent()).toEqual('Hello v2!');
     await goToAndRunExperiment(page, '/tests/fixtures/experiments/page-level?experiment=foo&experiment-variant=challenger-1');
     expect(await page.locator('main').textContent()).toEqual('Hello v1!');
     await goToAndRunExperiment(page, '/tests/fixtures/experiments/page-level--audiences?experiment=foo&experiment-variant=challenger-2&audience=bar');
     expect(await page.locator('main').textContent()).toEqual('Hello v2!');
+  });
+
+  test('triggers a DOM event with the experiment detail', async ({ page }) => {
+    await page.goto('/tests/fixtures/experiments/page-level?experiment=foo&experiment-variant=challenger-1');
+    expect(await waitForDomEvent(page, 'aem:experimentation')).toEqual({
+      type: 'experiment',
+      element: await page.evaluate(() => document.body),
+      experiment: 'foo',
+      variant: 'challenger-1',
+    });
   });
 });
 
@@ -178,8 +191,9 @@ test.describe('Section-level experiments', () => {
 
   test('Exposes the experiment in a JS API.', async ({ page }) => {
     await goToAndRunExperiment(page, '/tests/fixtures/experiments/section-level');
-    expect(await page.evaluate(() => window.hlx.experiments.sections)).toContainEqual(
+    expect(await page.evaluate(() => window.hlx.experiments)).toContainEqual(
       expect.objectContaining({
+        type: 'section',
         config: expect.objectContaining({
           id: 'bar',
           run: true,
@@ -195,6 +209,16 @@ test.describe('Section-level experiments', () => {
       }),
     );
   });
+
+  test('triggers a DOM event with the experiment detail', async ({ page }) => {
+    await page.goto('/tests/fixtures/experiments/section-level?experiment=bar/challenger-2');
+    expect(await waitForDomEvent(page, 'aem:experimentation')).toEqual({
+      type: 'experiment',
+      element: await page.evaluate(() => document.querySelector('.section')),
+      experiment: 'bar',
+      variant: 'challenger-2',
+    });
+  });
 });
 
 test.describe('Fragment-level experiments', () => {
@@ -207,6 +231,20 @@ test.describe('Fragment-level experiments', () => {
     expect(await page.locator('.fragment').first().textContent()).toContain('Hello v1!');
     await goToAndRunExperiment(page, '/tests/fixtures/experiments/fragment-level?experiment=baz/challenger-2');
     expect(await page.locator('.fragment').first().textContent()).toContain('Hello v2!');
+  });
+
+  test('Supports plural format for manifest keys.', async ({ page }) => {
+    await goToAndRunExperiment(page, '/tests/fixtures/experiments/fragment-level--alt?experiment=baz/control');
+    expect(await page.locator('.fragment').first().textContent()).toContain('Hello World!');
+    await goToAndRunExperiment(page, '/tests/fixtures/experiments/fragment-level--alt?experiment=baz/challenger-1');
+    expect(await page.locator('.fragment').first().textContent()).toContain('Hello v1!');
+    await goToAndRunExperiment(page, '/tests/fixtures/experiments/fragment-level--alt?experiment=baz/challenger-2');
+    expect(await page.locator('.fragment').first().textContent()).toContain('Hello v2!');
+  });
+
+  test('Ignores invalid manifest url.', async ({ page }) => {
+    await goToAndRunExperiment(page, '/tests/fixtures/experiments/fragment-level--invalid-url');
+    expect(await page.locator('.fragment').first().textContent()).toContain('Hello World!');
   });
 
   test('Replaces the async fragment content with the variant.', async ({ page }) => {
@@ -234,8 +272,9 @@ test.describe('Fragment-level experiments', () => {
 
   test('Exposes the experiment in a JS API.', async ({ page }) => {
     await goToAndRunExperiment(page, '/tests/fixtures/experiments/fragment-level');
-    expect(await page.evaluate(() => window.hlx.experiments.fragments)).toContainEqual(
+    expect(await page.evaluate(() => window.hlx.experiments)).toContainEqual(
       expect.objectContaining({
+        type: 'fragment',
         config: expect.objectContaining({
           id: 'baz',
           run: true,
@@ -250,6 +289,16 @@ test.describe('Fragment-level experiments', () => {
         servedExperience: expect.stringMatching(/\/tests\/fixtures\/experiments\/(fragment|section)-level/),
       }),
     );
+  });
+
+  test('triggers a DOM event with the experiment detail', async ({ page }) => {
+    await page.goto('/tests/fixtures/experiments/fragment-level?experiment=baz/challenger-1');
+    expect(await waitForDomEvent(page, 'aem:experimentation')).toEqual({
+      type: 'experiment',
+      element: await page.evaluate(() => document.querySelector('.fragment')),
+      experiment: 'baz',
+      variant: 'challenger-1',
+    });
   });
 });
 

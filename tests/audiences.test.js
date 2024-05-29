@@ -1,7 +1,7 @@
 /* eslint-disable import/no-extraneous-dependencies */
 import { test, expect } from '@playwright/test';
 import { track } from './coverage.js';
-import { goToAndRunAudience } from './utils.js';
+import { goToAndRunAudience, waitForDomEvent } from './utils.js';
 
 track(test);
 
@@ -35,6 +35,11 @@ test.describe('Page-level audiences', () => {
     expect(await page.locator('main').textContent()).toContain('Hello v2!');
   });
 
+  test('Ignores invalid audiences.', async ({ page }) => {
+    await goToAndRunAudience(page, '/tests/fixtures/audiences/page-level--invalid');
+    expect(await page.locator('main').textContent()).toContain('Hello v2!');
+  });
+
   test('Ignores invalid audience references in the query parameters.', async ({ page }) => {
     await goToAndRunAudience(page, '/tests/fixtures/audiences/page-level?audience=baz');
     expect(await page.locator('main').textContent()).toContain('Hello World!');
@@ -59,6 +64,33 @@ test.describe('Page-level audiences', () => {
       }),
     ]);
   });
+
+  test('Exposes the audiences in a JS API.', async ({ page }) => {
+    await goToAndRunAudience(page, '/tests/fixtures/audiences/page-level');
+    expect(await page.evaluate(() => window.hlx.audiences)).toContainEqual(
+      expect.objectContaining({
+        type: 'page',
+        config: expect.objectContaining({
+          configuredAudiences: {
+            foo: '/tests/fixtures/audiences/variant-1',
+            bar: '/tests/fixtures/audiences/variant-2',
+          },
+          resolvedAudiences: ['foo', 'bar'],
+          selectedAudience: 'foo',
+        }),
+        servedExperience: '/tests/fixtures/audiences/variant-1',
+      }),
+    );
+  });
+
+  test('triggers a DOM event with the audience detail', async ({ page }) => {
+    await page.goto('/tests/fixtures/audiences/page-level');
+    expect(await waitForDomEvent(page, 'aem:experimentation')).toEqual({
+      type: 'audience',
+      element: await page.evaluate(() => document.body),
+      audience: 'foo',
+    });
+  });
 });
 
 test.describe('Section-level audiences', () => {
@@ -76,8 +108,9 @@ test.describe('Section-level audiences', () => {
 
   test('Exposes the audiences in a JS API.', async ({ page }) => {
     await goToAndRunAudience(page, '/tests/fixtures/audiences/section-level');
-    expect(await page.evaluate(() => window.hlx.audiences.sections)).toContainEqual(
+    expect(await page.evaluate(() => window.hlx.audiences)).toContainEqual(
       expect.objectContaining({
+        type: 'section',
         config: expect.objectContaining({
           configuredAudiences: {
             foo: '/tests/fixtures/audiences/variant-1',
@@ -90,12 +123,31 @@ test.describe('Section-level audiences', () => {
       }),
     );
   });
+
+  test('triggers a DOM event with the audience detail', async ({ page }) => {
+    await page.goto('/tests/fixtures/audiences/section-level');
+    expect(await waitForDomEvent(page, 'aem:experimentation')).toEqual({
+      type: 'audience',
+      element: await page.evaluate(() => document.querySelector('.section')),
+      audience: 'bar',
+    });
+  });
 });
 
 test.describe('Fragment-level audiences', () => {
   test('Replaces the fragment content with the variant.', async ({ page }) => {
     await goToAndRunAudience(page, '/tests/fixtures/audiences/fragment-level');
     expect(await page.locator('.fragment').textContent()).toContain('Hello v1!');
+  });
+
+  test('Supports plural format for manifest keys.', async ({ page }) => {
+    await goToAndRunAudience(page, '/tests/fixtures/audiences/fragment-level--alt');
+    expect(await page.locator('.fragment').textContent()).toContain('Hello v1!');
+  });
+
+  test('Ignores invalid manifest url.', async ({ page }) => {
+    await goToAndRunAudience(page, '/tests/fixtures/audiences/fragment-level--invalid-url');
+    expect(await page.locator('.fragment').textContent()).toContain('Hello World!');
   });
 
   test('Replaces the async fragment content with the variant.', async ({ page }) => {
@@ -112,8 +164,9 @@ test.describe('Fragment-level audiences', () => {
 
   test('Exposes the audiences in a JS API.', async ({ page }) => {
     await goToAndRunAudience(page, '/tests/fixtures/audiences/fragment-level');
-    expect(await page.evaluate(() => window.hlx.audiences.fragments)).toContainEqual(
+    expect(await page.evaluate(() => window.hlx.audiences)).toContainEqual(
       expect.objectContaining({
+        type: 'fragment',
         config: expect.objectContaining({
           configuredAudiences: {
             foo: '/tests/fixtures/audiences/variant-1',
@@ -125,5 +178,14 @@ test.describe('Fragment-level audiences', () => {
         servedExperience: '/tests/fixtures/audiences/variant-1',
       }),
     );
+  });
+
+  test('triggers a DOM event with the audience detail', async ({ page }) => {
+    await page.goto('/tests/fixtures/audiences/fragment-level');
+    expect(await waitForDomEvent(page, 'aem:experimentation')).toEqual({
+      type: 'audience',
+      element: await page.evaluate(() => document.querySelector('.fragment')),
+      audience: 'foo',
+    });
   });
 });
