@@ -4,7 +4,7 @@ import MCR from 'monocart-coverage-reports';
 const coverageReport = MCR({
   name: 'AEM Experimentation Plugin Coverage Report',
   outputDir: './coverage',
-  reports: ['v8', 'console-details'],
+  reports: ['v8', 'console-details', 'codecov'],
   entryFilter: {
     '**/src/ued.js': false,
     '**/src/**': true,

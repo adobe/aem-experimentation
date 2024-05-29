@@ -20,3 +20,7 @@ jobs:
     - run: npm run test
       env:
         CI: true
+    - name: Codecov
+      uses: codecov/codecov-action@v3
+      with:
+          files: ./coverage/codecov.json
