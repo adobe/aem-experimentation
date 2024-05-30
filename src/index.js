@@ -236,6 +236,7 @@ function getConfigForInstantExperiment(
     status: context.getMetadata(`${pluginOptions.experimentsMetaTag}-status`) || 'Active',
     startDate: context.getMetadata(`${pluginOptions.experimentsMetaTag}-start-date`),
     endDate: context.getMetadata(`${pluginOptions.experimentsMetaTag}-end-date`),
+    selfLearning: context.getMetadata(`${pluginOptions.experimentsMetaTag}-self-learning`) || 'false',
     id: experimentId,
     variants: {},
     variantNames: [],
@@ -363,6 +364,19 @@ async function getConfig(experiment, instantExperiment, pluginOptions, context) 
   console.debug(experimentConfig);
   if (!experimentConfig) {
     return null;
+  }
+
+  // Load MAB split overrides
+  if (['active', 'on', 'true'].includes(context.toClassName(experimentConfig.selfLearning))) {
+    try {
+      const request = await fetch('/mab.config.json');
+      const json = await request.json();
+      Object.entries(experimentConfig.variants).forEach(([k, v]) => {
+        v.percentageSplit = json[experimentConfig.id][k];
+      });
+    } catch (err) {
+      // Nothing to do
+    }
   }
 
   const forcedAudience = usp.has(pluginOptions.audiencesQueryParameter)
