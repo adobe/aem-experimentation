@@ -1,3 +1,5 @@
+# Running A/B tests to compare variants of an experience
+
 ## Overview
 
 With experiments (also called A/B tests) you can randomly serve different versions of your content to your end users to test out alternate experiences or validate conversion hypotheses. For instance, you can:
@@ -52,7 +54,7 @@ If you want to control the split ratio, you can use:
 |---------------------|--------------------------------------------------------------|
 | Experiment          | Hero Test                                                    |
 | Experiment Variants | [https://{ref}--{repo}--{org}.hlx.page/my-page-variant-1](), [https://{ref}--{repo}--{org}.hlx.page/my-page-variant-2](), [https://{ref}--{repo}--{org}.hlx.page/my-page-variant-3]() |
-| Experiment Split    |  10%, 20%, 30%                                               |
+| Experiment Split    |  10, 20, 30                                                  |
 
 This would give us the following split:
 
@@ -61,7 +63,7 @@ This would give us the following split:
 - 30% on variant 3
 - 40% on the control  (i.e 100% - 10% - 20% - 30% = 40%)
 
-A `30%, 30%, 40%` split, would respectively give us:
+A `30, 30, 40` split, would respectively give us:
 
 - 30% on variant 1
 - 30% on variant 2
@@ -154,8 +156,6 @@ Once all of this is set up, authors will have access to an overlay on `localhost
 ![audience overlay](./images/experiments-overlay.png)
 
 The simulation capabilities leverage the `audience` query parameter that is appended to the URL and forcibly let you see the specific content variant.
-
-You can also manually set query parameters overrides for every property if needed.
 
 ### Inline Reporting
 

@@ -1,3 +1,5 @@
+# Using audiences to personalize the experience
+
 ## Overview
 
 With audiences you can serve different versions of your content to different groups of users based on the information you can glean from there current session. For instance, you can optimize the experience for:
@@ -98,6 +100,7 @@ The spreadsheet then needs to be defined as follows:
 
 The same spreadsheet can also contain the configuration for several pages at once. The engine will filter out the entries in the spreadsheet that match the current page.
 
+
 ### Simulation
 
 Once all of this is set up, authors will have access to an overlay on `localhost` and on the stage environments (i.e. `*.hlx.page`) that lets them see what audiences have been configured for the page and switch between each to visualize the content variations accordingly.
@@ -105,8 +108,6 @@ Once all of this is set up, authors will have access to an overlay on `localhost
 ![audience overlay](./images/audiences-overlay.png)
 
 The simulation capabilities leverage the `audience` query parameter that is appended to the URL and forcibly let you see the specific content variant.
-
-You can also manually set query parameters overrides for every property if needed.
 
 ## Development
 

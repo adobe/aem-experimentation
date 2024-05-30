@@ -1,3 +1,5 @@
+# Running marketing campaigns that personalize the experience
+
 ## Overview
 
 With campaigns you can send out emails or social media posts that link back to your site and that will serve specific offers or versions of your content to the targeted audience.
@@ -90,8 +92,6 @@ The same spreadsheet can also contain the configuration for several pages at onc
 Once all of this is set up, authors will have access to an overlay on `localhost` and on the stage environments (i.e. `*.hlx.stage`) that lets them see what campaigns have been configured for the page and switch between each to visualize the content variations accordingly.
 
 ![audience overlay](./images/campaigns-overlay.png)
-
-You can also manually set query parameters overrides for every property if needed.
 
 ## Development
 
