@@ -34,22 +34,33 @@ Typically, you'd know you don't have the plugin system if you don't see a refere
 
 1. at the start of the file:
     ```js
-    const AUDIENCES = {
-      mobile: () => window.innerWidth < 600,
-      desktop: () => window.innerWidth >= 600,
-      // define your custom audiences here as needed
+    const experimentationConfig = {
+      prodHost: 'www.my-site.com',
+      audiences: {
+        mobile: () => window.innerWidth < 600,
+        desktop: () => window.innerWidth >= 600,
+        // define your custom audiences here as needed
+      }
     };
+
+    let runExperimentation;
+    let showExperimentationOverlay;
+    const isExperimentationEnabled = document.head.querySelector('[name^="experiment"],[name^="campaign-"],[name^="audience-"]')
+        || [...document.querySelectorAll('.section-metadata div')].some((d) => d.textContent.match(/Experiment|Campaign|Audience/i));
+    if (isExperimentationEnabled) {
+       const {
+        loadEager: runExperimentation,
+        loadLazy: showExperimentationOverlay,
+       } = await import('../plugins/experimentation/src/index.js');
+    }
     ```
 2. Early in the `loadEager` method you'll need to add:
     ```js
     async function loadEager(doc) {
       …
       // Add below snippet early in the eager phase
-      if (document.head.querySelector('[name^="experiment"],[name^="campaign-"],[name^="audience-"]')
-        || [...document.querySelectorAll('.section-metadata div')].some((d) => d.textContent.match(/Experiment|Campaign|Audience/i))) {
-        // eslint-disable-next-line import/no-relative-packages
-        const { loadEager: runEager } = await import('../plugins/experimentation/src/index.js');
-        await runEager(document, { audiences: AUDIENCES, prodHost: 'www.my-site.com' });
+      if (runExperimentation) {
+        await runExperimentation(document, experimentationConfig);
       }
       …
     }
@@ -60,11 +71,8 @@ Typically, you'd know you don't have the plugin system if you don't see a refere
     async function loadLazy(doc) {
       …
       // Add below snippet at the end of the lazy phase
-      if (document.head.querySelector('[name^="experiment"],[name^="campaign-"],[name^="audience-"]')
-        || [...document.querySelectorAll('.section-metadata div')].some((d) => d.textContent.match(/Experiment|Campaign|Audience/i))) {
-        // eslint-disable-next-line import/no-relative-packages
-        const { loadLazy: runLazy } = await import('../plugins/experimentation/src/index.js');
-        await runLazy(document, { audiences: AUDIENCES, prodHost: 'www.my-site.com' });
+      if (showExperimentationOverlay) {
+        await showExperimentationOverlay(document, experimentationConfig);
       }
     }
     ```
@@ -79,16 +87,19 @@ If you don't have it, you can follow the proposal in https://github.com/adobe/ae
 
 Once you have confirmed this, you'll need to edit your `scripts.js` in your AEM project and add the following at the start of the file:
 ```js
-const AUDIENCES = {
-  mobile: () => window.innerWidth < 600,
-  desktop: () => window.innerWidth >= 600,
-  // define your custom audiences here as needed
+const experimentationConfig = {
+  prodHost: 'www.my-site.com',
+  audiences: {
+    mobile: () => window.innerWidth < 600,
+    desktop: () => window.innerWidth >= 600,
+    // define your custom audiences here as needed
+  }
 };
 
 window.aem.plugins.add('experimentation', { // use window.hlx instead of your project has this
   condition: () => document.head.querySelector('[name^="experiment"],[name^="campaign-"],[name^="audience-"]')
     || [...document.querySelectorAll('.section-metadata div')].some((d) => d.textContent.match(/Experiment|Campaign|Audience/i)),
-  options: { audiences: AUDIENCES, prodHost: 'www.my-site.com' },
+  options: experimentationConfig,
   url: '/plugins/experimentation/src/index.js',
 });
 ```
