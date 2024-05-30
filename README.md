@@ -170,3 +170,32 @@ For detailed implementation instructions on the different features, please read 
 - [Audiences](/documentation/audiences.md)
 - [Campaigns](/documentation/campaigns.md)
 - [Experiments](/documentation/experiments.md)
+
+## Extensibility & integrations
+
+If you need to further integrate the experimentation plugin with custom analytics reporting or other 3rd-party libraries, you can listen for the `aem:experimentation` event:
+```js
+document.addEventListener('aem:experimentation', (ev) => console.log(ev.detail));
+```
+
+The event details will contain one of 3 possible sets of properties:
+- For experiments:
+  - `type`: `experiment`
+  - `element`: the DOM element that was modified
+  - `experiment`: the experiment name
+  - `variant`: the variant name that was served
+- For audiences:
+  - `type`: `audience`
+  - `element`: the DOM element that was modified
+  - `audience`: the audience that was resolved
+- For campaigns:
+  - `type`: `campaign`
+  - `element`: the DOM element that was modified
+  - `campaign`: the campaign that was resolved
+
+Additionally, you can leverage the following global JS objects `window.hlx.experiments`, `window.hlx.audiences` and `window.hlx.campaigns`.
+Those will each be an array of objects containing:
+  - `type`: one of `page`, `section` or `fragment`
+  - `el`: the DOM element that was modified
+  - `servedExperience`: the URL for the content that was inlined for that experience
+  - `config`: an object containing the config details
