@@ -29,6 +29,8 @@ export const DEFAULT_OPTIONS = {
   experimentsConfigFile: 'manifest.json',
   experimentsMetaTag: 'experiment',
   experimentsQueryParameter: 'experiment',
+
+  mabConfig: '/experiments.mab.json',
 };
 
 /**
@@ -369,10 +371,10 @@ async function getConfig(experiment, instantExperiment, pluginOptions, context) 
   // Load MAB split overrides
   if (['active', 'on', 'true'].includes(context.toClassName(experimentConfig.selfLearning))) {
     try {
-      const request = await fetch('/mab.config.json');
+      const request = await fetch(pluginOptions.mabConfig);
       const json = await request.json();
       Object.entries(experimentConfig.variants).forEach(([k, v]) => {
-        v.percentageSplit = json[experimentConfig.id][k];
+        v.percentageSplit = (json[experimentConfig.id][k] / 100).toFixed(4);
       });
     } catch (err) {
       // Nothing to do
