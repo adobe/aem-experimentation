@@ -373,9 +373,13 @@ async function getConfig(experiment, instantExperiment, pluginOptions, context) 
     try {
       const request = await fetch(pluginOptions.mabConfig);
       const json = await request.json();
-      Object.entries(experimentConfig.variants).forEach(([k, v]) => {
-        v.percentageSplit = (json[experimentConfig.id][k] / 100).toFixed(4);
-      });
+      const config = json[window.location.pathname]
+        && json[window.location.pathname][experimentConfig.id];
+      if (config) {
+        Object.entries(experimentConfig.variants).forEach(([k, v]) => {
+          v.percentageSplit = (config[k] / 100).toFixed(4);
+        });
+      }
     } catch (err) {
       // Nothing to do
     }
