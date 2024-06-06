@@ -30,7 +30,7 @@ export const DEFAULT_OPTIONS = {
   experimentsMetaTag: 'experiment',
   experimentsQueryParameter: 'experiment',
 
-  mabConfig: '/experiments.mab.json',
+  mabConfig: '/experiments.splits.json',
 };
 
 /**
@@ -373,11 +373,14 @@ async function getConfig(experiment, instantExperiment, pluginOptions, context) 
     try {
       const request = await fetch(pluginOptions.mabConfig);
       const json = await request.json();
-      const config = json[window.location.pathname]
-        && json[window.location.pathname][experimentConfig.id];
-      if (config) {
+      const [, pageConfig] = Object.entries(json)
+        .find(([url]) => new URL(url).pathname === window.location.pathname);
+      const mabConfig = pageConfig
+        ? pageConfig[context.toClassName(experimentConfig.id)]
+        : null;
+      if (mabConfig) {
         Object.entries(experimentConfig.variants).forEach(([k, v]) => {
-          v.percentageSplit = (config[k] / 100).toFixed(4);
+          v.percentageSplit = (mabConfig[k]).toFixed(4);
         });
       }
     } catch (err) {
