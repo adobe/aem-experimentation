@@ -60,6 +60,18 @@ function getOverlay() {
   let overlay = document.querySelector('aem-experimentation-bar')?.shadowRoot.children[1];
   if (!overlay) {
     const el = createPreviewOverlay();
+    const style = document.createElement('style');
+    style.textContent = `
+      .hlx-highlight {
+        --highlight-size: .5rem;
+      
+        outline-color: #888;
+        outline-offset: calc(-1 * var(--highlight-size));
+        outline-style: dashed;
+        outline-width: var(--highlight-size);
+        background-color: #8882;
+      }`;
+    el.prepend(style);
     document.body.prepend(el);
     [, overlay] = el.shadowRoot.children;
   }
