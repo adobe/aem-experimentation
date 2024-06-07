@@ -6,7 +6,7 @@ With experiments (also called A/B tests) you can randomly serve different versio
 
 The set up is pretty minimal. Once you've instrumented the experimentation plugin in your AEM website, you are essentially good to go.
 
-Just keep in mind that if you want to only target specific audiences for that experiment, you'll also need to set up the [audiences](Audiences) accordingly for your project.
+Just keep in mind that if you want to only target specific audiences for that experiment, you'll also need to set up the [audiences](./audiences.md) accordingly for your project.
 
 ### Custom options
 
@@ -82,7 +82,7 @@ This will create just 2 variants, without touching the content, and you'll be ab
 
 #### Audience-based experiments
 
-If you wanted to additionally restrict the experiments to specific audiences, so that for instance your experiment is only run on iPad or on iPhone, you'd leverage the [audiences](Audiences) feature and use the following metadata:
+If you wanted to additionally restrict the experiments to specific audiences, so that for instance your experiment is only run on iPad or on iPhone, you'd leverage the [audiences](./audiences.md) feature and use the following metadata:
 
 | Metadata            |                                                              |
 |---------------------|--------------------------------------------------------------|
