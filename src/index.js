@@ -238,7 +238,7 @@ function getConfigForInstantExperiment(
     status: context.getMetadata(`${pluginOptions.experimentsMetaTag}-status`) || 'Active',
     startDate: context.getMetadata(`${pluginOptions.experimentsMetaTag}-start-date`),
     endDate: context.getMetadata(`${pluginOptions.experimentsMetaTag}-end-date`),
-    selfLearning: context.getMetadata(`${pluginOptions.experimentsMetaTag}-self-learning`) || 'false',
+    selfLearning: context.getMetadata(`${pluginOptions.experimentsMetaTag}-auto-allocate`) || 'false',
     id: experimentId,
     variants: {},
     variantNames: [],
