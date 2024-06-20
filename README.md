@@ -78,6 +78,16 @@ Typically, you'd know you don't have the plugin system if you don't see a refere
       toClassName,
     };
     ```
+    And make sure to import any missing/undefined methods from `aem.js`/`lib-franklin.js` at the very top of the file:
+    ```js
+    import {
+      ...
+      getMetadata,
+      loadScript,
+      toCamelCase,
+      toClassName,
+    } from './aem.js';
+    ```
 3. Early in the `loadEager` method you'll need to add:
     ```js
     async function loadEager(doc) {
