@@ -78,7 +78,7 @@ Typically, you'd know you don't have the plugin system if you don't see a refere
       toClassName,
     };
     ```
-    And make sure to import any missing/undefined methods from `aem.js` at the very top of the file:
+    And make sure to import any missing/undefined methods from `aem.js`/`lib-franklin.js` at the very top of the file:
     ```js
     import {
       ...
