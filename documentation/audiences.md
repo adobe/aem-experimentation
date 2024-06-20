@@ -1,9 +1,13 @@
+# Using audiences to personalize the experience
+
+## Overview
+
 With audiences you can serve different versions of your content to different groups of users based on the information you can glean from there current session. For instance, you can optimize the experience for:
 - mobile vs. desktop
 - Chrome vs. Firefox
 - 1st vs. returning visitor
 - fast vs slow connections
-- different ge0graphies
+- different geographies
 - etc.
 
 ## Set up
@@ -33,7 +37,7 @@ The audiences for the project then need to be passed to the plugin initializatio
 
 ```js
 const { loadEager } = await import('../plugins/experimentation/src/index.js');
-await loadEager(document, { audiences: AUDIENCES }, /* plugin execution context */);
+await loadEager(document, { audiences: AUDIENCES });
 ```
 
 ### Custom options
@@ -47,13 +51,17 @@ await loadEager(document, {
   audiences: AUDIENCES,
   audiencesMetaTagPrefix: 'segment',
   audiencesQueryParameter: 'segment',
-}, /* plugin execution context */);
+});
 ```
 
 ## Authoring
 
-Once the audiences made it into the project codebase, your authors are ready to start using audiences for their experiences.
-This is done directly in the page metadata block:
+Once the above steps are done, your authors are ready to start using audiences for their experiences.
+
+### Page-level audiences
+
+Each Page can have several page-level audiences defined in the page metadata.
+The audiences are set up directly in the page metadata block as follows:
 
 | Metadata          |                                                               |
 |-------------------|---------------------------------------------------------------|
@@ -61,6 +69,37 @@ This is done directly in the page metadata block:
 | Audience: Desktop | [https://{ref}--{repo}--{org}.hlx.page/my-page-for-desktop]() |
 
 The notation is pretty flexible and authors can also use `Audience (Mobile)` or `Audience Mobile` if this is a preferred notation.
+
+### Section-level audiences
+
+Each section in a page can also run any number of audiences. Section-level audiences are run after the page-level audiences have run, i.e. after the variants have been processed and their markup was pulled into the main page, so the section-level audiences that will run are dictated by the document from the current page-level experiment/audience/campaign, and not necessarily just the main page.
+
+Section-level audiences are authored essentially the same way that page-level audiences are, but leverage the `Section Metadata` block instead:
+
+| Section Metadata  |                                                               |
+|-------------------|---------------------------------------------------------------|
+| Audience: Mobile  | [https://{ref}--{repo}--{org}.hlx.page/my-page-for-mobile]()  |
+| Audience: Desktop | [https://{ref}--{repo}--{org}.hlx.page/my-page-for-desktop]() |
+
+### Fragment-level audiences
+
+Fragment-level audiences are handled differently than page and section-level audiences. They target a specific CSS selector instead of the whole page or the section. Whenever the desired CSS `selector` is resolved in the DOM tree (i.e. whenever the element is added to the page), the audiences will be run. For AEM, this typically happens even before the `decorate` method from the block's JS file is run.
+
+Fragment-level audiences are also authored differently than page and section-level audiences. First, you need to specify a new metadata entry:
+
+| Metadata            |                                                                               |
+|---------------------|-------------------------------------------------------------------------------|
+| Audience Manifest | [https://{ref}--{repo}--{org}.hlx.page/my-audiences.json?sheet=mobile]() |
+
+The spreadsheet then needs to be defined as follows:
+
+| Page      | Audience | Selector | Url                             |
+|-----------|----------|----------|---------------------------------|
+| /my-page/ | Mobile   | .hero    | /fragments/my-page-hero-mobile  |
+| /my-page/ | Desktop  | .hero    | /fragments/my-page-hero-desktop |
+
+The same spreadsheet can also contain the configuration for several pages at once. The engine will filter out the entries in the spreadsheet that match the current page.
+
 
 ### Simulation
 
