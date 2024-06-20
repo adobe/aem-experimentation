@@ -185,7 +185,7 @@ function getAllSectionMeta(block, scope) {
  * @param {HTMLElement} el
  * @return Returns the path that was loaded or null if the loading failed
  */
-async function replaceInner(path, el) {
+async function replaceInner(path, el, selector) {
   try {
     const resp = await fetch(path);
     if (!resp.ok) {
@@ -197,7 +197,13 @@ async function replaceInner(path, el) {
     // parse with DOMParser to guarantee valid HTML, and no script execution(s)
     const dom = new DOMParser().parseFromString(html, 'text/html');
     // eslint-disable-next-line no-param-reassign
-    const newEl = dom.querySelector(el.tagName === 'MAIN' ? 'main' : 'main > div');
+    let newEl;
+    if (selector) {
+      newEl = dom.querySelector(selector);
+    }
+    if (!newEl) {
+      newEl = dom.querySelector(el.tagName === 'MAIN' ? 'main' : 'main > div');
+    }
     el.innerHTML = newEl.innerHTML;
     return path;
   } catch (e) {
@@ -412,7 +418,7 @@ function watchMutationsAndApplyFragments(
       let res;
       if (url && new URL(url, window.location.origin).pathname !== window.location.pathname) {
         // eslint-disable-next-line no-await-in-loop
-        res = await replaceInner(url, el);
+        res = await replaceInner(url, el, entry.selector);
       } else {
         res = url;
       }
