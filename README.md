@@ -168,6 +168,9 @@ runEager.call(document, {
   // short durations of those campaigns/experiments
   rumSamplingRate: 10,
 
+  // these metadata fields will be updated when replacing content
+  overrideMetaFields: ['template', 'theme'],
+
   // the storage type used to persist data between page views
   // (for instance to remember what variant in an experiment the user was served)
   storage: window.SessionStorage,
