@@ -579,7 +579,7 @@ async function getExperimentConfig(pluginOptions, metadata, overrides) {
   };
 
   // get the custom labels for the variants names
-  const labelNames = stringToArray(getMetadata("variants-name"));
+  const labelNames = stringToArray(getMetadata("variant-names"));
   pages.forEach((page, i) => {
     //id
     const vname = `challenge-${i + 1}`;
