@@ -578,14 +578,21 @@ async function getExperimentConfig(pluginOptions, metadata, overrides) {
     label: 'Control',
   };
 
+  // get the custom labels for the variants names
+  const labelNames = stringToArray(getMetadata("variants-name"));
   pages.forEach((page, i) => {
-    const vname = `challenger-${i + 1}`;
+    //id
+    const vname = `challenge-${i + 1}`;
+    //label with custom name or default
+    const customLabel =
+      labelNames.length > i ? labelNames[i] : `Challenger ${i + 1}`;
+
     variantNames.push(vname);
     variants[vname] = {
       percentageSplit: `${splits[i].toFixed(4)}`,
       pages: [page],
       blocks: [],
-      label: `Challenger ${i + 1}`,
+      label: customLabel,
     };
   });
   inferEmptyPercentageSplits(Object.values(variants));
@@ -643,6 +650,7 @@ async function getExperimentConfig(pluginOptions, metadata, overrides) {
 
   return config;
 }
+
 /**
  * Parses the campaign manifest.
  */
