@@ -103,9 +103,8 @@ export function getAllMetadata(scope) {
 
     const camelCaseKey = toCamelCase(key);
     res[camelCaseKey] = meta.getAttribute('content');
-    
     return res;
-    }, value ? { value } : {});
+  }, value ? { value } : {});
 }
 
 /**
