@@ -75,14 +75,15 @@ which would essentially disable the control page.
 If you need to be really granular, decimal numbers are also supported, like `33.34, 33.33, 33.33`.
 
 #### Custom Variant Labels
-This feature allows authors to specify custom labels for experiment variants via metadata. While the internal variant IDs remain in a predefined format (e.g., challenger-1, challenger-2), the labels in the overlay pill can be customized to provide more meaningful names.
+This feature allows authors to specify custom labels for both page and section experiment variants via metadata. While the internal variant IDs remain in a predefined format (e.g., challenger-1, challenger-2), the labels in the overlay pill can be customized to provide more meaningful names.
 
-To customize the labels, add a new entry in the page metadata in the format:
+To customize the labels, add a new entry in the page metadata or section metadata(below takes page metadata as an example):
+
 | Metadata            |                                                              |
 |---------------------|--------------------------------------------------------------|
 | Experiment          | Hero Test                                                    |
 | Experiment Variants | [https://{ref}--{repo}--{org}.hlx.page/my-page-variant-1](), [https://{ref}--{repo}--{org}.hlx.page/my-page-variant-2](), [https://{ref}--{repo}--{org}.hlx.page/my-page-variant-3]() |
-| Variant Names      |  foo1, foo2, foo3                                                 |
+| Experiment Names    |  foo1, foo2, foo3                                                 |
 
 The names defined will match with the corresponding variants in sequence. If the number of names provided is less than the number of variants, the default naming will be applied for the remaining variants.
 
