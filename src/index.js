@@ -29,6 +29,8 @@ export const DEFAULT_OPTIONS = {
   experimentsConfigFile: 'manifest.json',
   experimentsMetaTag: 'experiment',
   experimentsQueryParameter: 'experiment',
+
+  mabConfig: '/experiments.splits.json',
 };
 
 /**
@@ -236,6 +238,7 @@ function getConfigForInstantExperiment(
     status: context.getMetadata(`${pluginOptions.experimentsMetaTag}-status`) || 'Active',
     startDate: context.getMetadata(`${pluginOptions.experimentsMetaTag}-start-date`),
     endDate: context.getMetadata(`${pluginOptions.experimentsMetaTag}-end-date`),
+    selfLearning: context.getMetadata(`${pluginOptions.experimentsMetaTag}-auto-allocate`) || 'false',
     id: experimentId,
     variants: {},
     variantNames: [],
@@ -363,6 +366,26 @@ async function getConfig(experiment, instantExperiment, pluginOptions, context) 
   console.debug(experimentConfig);
   if (!experimentConfig) {
     return null;
+  }
+
+  // Load MAB split overrides
+  if (['active', 'on', 'true'].includes(context.toClassName(experimentConfig.selfLearning))) {
+    try {
+      const request = await fetch(pluginOptions.mabConfig);
+      const json = await request.json();
+      const [, pageConfig] = Object.entries(json)
+        .find(([url]) => new URL(url).pathname === window.location.pathname);
+      const mabConfig = pageConfig
+        ? pageConfig[context.toClassName(experimentConfig.id)]
+        : null;
+      if (mabConfig) {
+        Object.entries(experimentConfig.variants).forEach(([k, v]) => {
+          v.percentageSplit = (mabConfig[k]).toFixed(4);
+        });
+      }
+    } catch (err) {
+      // Nothing to do
+    }
   }
 
   const forcedAudience = usp.has(pluginOptions.audiencesQueryParameter)
