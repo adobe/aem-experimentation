@@ -681,6 +681,8 @@ async function runExperiment(document, pluginOptions) {
     (el, config, result) => {
       const { id, selectedVariant, variantNames } = config;
       const variant = result ? selectedVariant : variantNames[0];
+      el.dataset.experiment = id;
+      el.dataset.variant = variant;
       el.classList.add(`experiment-${toClassName(id)}`);
       el.classList.add(`variant-${toClassName(variant)}`);
       window.hlx?.rum?.sampleRUM('experiment', {
@@ -782,10 +784,12 @@ async function runCampaign(document, pluginOptions) {
     (el, config, result) => {
       const { selectedCampaign = 'default' } = config;
       const campaign = result ? toClassName(selectedCampaign) : 'default';
+      el.dataset.audience = selectedCampaign;
+      el.dataset.audiences = pluginOptions.audiences.join(',');
       el.classList.add(`campaign-${campaign}`);
-      window.hlx?.rum?.sampleRUM('campaign', {
-        source: el.className,
-        target: campaign,
+      window.hlx?.rum?.sampleRUM('audiences', {
+        source: `campaign-${campaign}`,
+        target: pluginOptions.audiences,
       });
       document.dispatchEvent(new CustomEvent('aem:experimentation', {
         detail: {
@@ -852,6 +856,7 @@ function getUrlFromAudienceConfig(config) {
 }
 
 async function serveAudience(document, pluginOptions) {
+  document.body.dataset.audiences = pluginOptions.audiences.join(',');
   return applyAllModifications(
     pluginOptions.audiencesMetaTagPrefix,
     pluginOptions.audiencesQueryParameter,
@@ -862,10 +867,11 @@ async function serveAudience(document, pluginOptions) {
     (el, config, result) => {
       const { selectedAudience = 'default' } = config;
       const audience = result ? toClassName(selectedAudience) : 'default';
+      el.dataset.audience = audience;
       el.classList.add(`audience-${audience}`);
-      window.hlx?.rum?.sampleRUM('audience', {
-        source: el.className,
-        target: audience,
+      window.hlx?.rum?.sampleRUM('audiences', {
+        source: audience,
+        target: pluginOptions.audiences.join(':'),
       });
       document.dispatchEvent(new CustomEvent('aem:experimentation', {
         detail: {
