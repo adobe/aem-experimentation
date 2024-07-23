@@ -785,11 +785,11 @@ async function runCampaign(document, pluginOptions) {
       const { selectedCampaign = 'default' } = config;
       const campaign = result ? toClassName(selectedCampaign) : 'default';
       el.dataset.audience = selectedCampaign;
-      el.dataset.audiences = pluginOptions.audiences.join(',');
+      el.dataset.audiences = Object.keys(pluginOptions.audiences).join(',');
       el.classList.add(`campaign-${campaign}`);
       window.hlx?.rum?.sampleRUM('audience', {
-        source: `campaign-${campaign}`,
-        target: pluginOptions.audiences,
+        source: campaign,
+        target: Object.keys(pluginOptions.audiences).join(':'),
       });
       document.dispatchEvent(new CustomEvent('aem:experimentation', {
         detail: {
@@ -856,7 +856,7 @@ function getUrlFromAudienceConfig(config) {
 }
 
 async function serveAudience(document, pluginOptions) {
-  document.body.dataset.audiences = pluginOptions.audiences.join(',');
+  document.body.dataset.audiences = Object.keys(pluginOptions.audiences).join(',');
   return applyAllModifications(
     pluginOptions.audiencesMetaTagPrefix,
     pluginOptions.audiencesQueryParameter,
@@ -871,7 +871,7 @@ async function serveAudience(document, pluginOptions) {
       el.classList.add(`audience-${audience}`);
       window.hlx?.rum?.sampleRUM('audience', {
         source: audience,
-        target: pluginOptions.audiences.join(':'),
+        target: Object.keys(pluginOptions.audiences).join(':'),
       });
       document.dispatchEvent(new CustomEvent('aem:experimentation', {
         detail: {
