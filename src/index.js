@@ -584,7 +584,7 @@ async function getExperimentConfig(pluginOptions, metadata, overrides) {
   };
 
   // get the custom labels for the variants names
-  const labelNames = stringToArray(metadata.variant ?? metadata.names);
+  const labelNames = stringToArray(metadata.name);
   pages.forEach((page, i) => {
     const vname = `challenger-${i + 1}`;
     //  label with custom name or default
@@ -659,9 +659,9 @@ async function getExperimentConfig(pluginOptions, metadata, overrides) {
  */
 function parseExperimentManifest(entries) {
   return Object.values(Object.groupBy(
-    entries.map((e) => depluralizeProps(e, ['experiment', 'variant', 'split'])),
+    entries.map((e) => depluralizeProps(e, ['experiment', 'name', 'split'])),
     ({ experiment }) => experiment,
-  )).map(aggregateEntries('experiment', ['split', 'url', 'variant']));
+  )).map(aggregateEntries('experiment', ['split', 'url', 'name']));
 }
 
 function getUrlFromExperimentConfig(config) {
