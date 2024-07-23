@@ -787,9 +787,9 @@ async function runCampaign(document, pluginOptions) {
       el.dataset.audience = selectedCampaign;
       el.dataset.audiences = Object.keys(pluginOptions.audiences).join(',');
       el.classList.add(`campaign-${campaign}`);
-      window.hlx?.rum?.sampleRUM('audiences', {
-        source: `campaign-${campaign}`,
-        target: pluginOptions.audiences,
+      window.hlx?.rum?.sampleRUM('audience', {
+        source: campaign,
+        target: Object.keys(pluginOptions.audiences).join(':'),
       });
       document.dispatchEvent(new CustomEvent('aem:experimentation', {
         detail: {
@@ -869,7 +869,7 @@ async function serveAudience(document, pluginOptions) {
       const audience = result ? toClassName(selectedAudience) : 'default';
       el.dataset.audience = audience;
       el.classList.add(`audience-${audience}`);
-      window.hlx?.rum?.sampleRUM('audiences', {
+      window.hlx?.rum?.sampleRUM('audience', {
         source: audience,
         target: Object.keys(pluginOptions.audiences).join(':'),
       });
