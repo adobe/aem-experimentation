@@ -341,7 +341,8 @@ function createModificationsHandler(
     const url = await getExperienceUrl(ns.config);
     let res;
     if (url && new URL(url, window.location.origin).pathname !== window.location.pathname) {
-      res = await replaceInner(url, el);
+      // eslint-disable-next-line no-await-in-loop
+      res = await replaceInner(new URL(url, window.location.origin).pathname, el);
     } else {
       res = url;
     }
@@ -377,7 +378,7 @@ function depluralizeProps(obj, props = []) {
 async function getManifestEntriesForCurrentPage(urlString) {
   try {
     const url = new URL(urlString, window.location.origin);
-    const response = await fetch(url);
+    const response = await fetch(url.pathname);
     const json = await response.json();
     return json.data
       .map((entry) => Object.keys(entry).reduce((res, k) => {
@@ -434,7 +435,7 @@ function watchMutationsAndApplyFragments(
       let res;
       if (url && new URL(url, window.location.origin).pathname !== window.location.pathname) {
         // eslint-disable-next-line no-await-in-loop
-        res = await replaceInner(url, el, entry.selector);
+        res = await replaceInner(new URL(url, window.location.origin).pathname, el, entry.selector);
       } else {
         res = url;
       }
