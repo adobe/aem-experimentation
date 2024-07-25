@@ -659,9 +659,9 @@ async function getExperimentConfig(pluginOptions, metadata, overrides) {
  */
 function parseExperimentManifest(entries) {
   return Object.values(Object.groupBy(
-    entries.map((e) => depluralizeProps(e, ['experiment', 'name', 'split'])),
+    entries.map((e) => depluralizeProps(e, ['experiment', 'variant', 'split', 'name'])),
     ({ experiment }) => experiment,
-  )).map(aggregateEntries('experiment', ['split', 'url', 'name']));
+  )).map(aggregateEntries('experiment', ['split', 'url', 'variant', 'name']));
 }
 
 function getUrlFromExperimentConfig(config) {
