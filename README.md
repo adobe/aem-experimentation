@@ -45,7 +45,7 @@ Typically, you'd know you don't have the plugin system if you don't see a refere
 
     let runExperimentation;
     let showExperimentationOverlay;
-    const isExperimentationEnabled = document.head.querySelector('[name^="experiment"],[name^="campaign-"],[name^="audience-"]')
+    const isExperimentationEnabled = document.head.querySelector('[name^="experiment"],[name^="campaign-"],[name^="audience-"],[property^="campaign:"],[property^="audience:"]')
         || [...document.querySelectorAll('.section-metadata div')].some((d) => d.textContent.match(/Experiment|Campaign|Audience/i));
     if (isExperimentationEnabled) {
        const {
