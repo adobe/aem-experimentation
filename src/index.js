@@ -88,6 +88,46 @@ export function removeLeadingHyphens(inputString) {
 }
 
 /**
+ * Check if the block is a hero block and rebuild it if needed.
+ * @param {Function} buildBlock
+ * @param {Element} el
+ * @returns revised element
+ */
+function rebuildIfHeroBlock(buildBlock, element) {
+  if (!element.classList.contains('hero')) return element;
+  const main = element.parentElement.parentElement;
+  [...element.children].reverse().forEach((el) => main.prepend(el));
+  element.remove();
+
+  // build hero block
+  const h1 = main.querySelector('main > div > h1');
+  const picture = main.querySelector('main > div > p > picture');
+  // eslint-disable-next-line no-bitwise
+  if (h1 && picture && (h1.compareDocumentPosition(picture) & Node.DOCUMENT_POSITION_PRECEDING)) {
+    const section = document.createElement('div');
+    section.append(buildBlock('hero', { elems: [picture, h1] }));
+    main.prepend(section);
+  }
+
+  return document.querySelector('.hero');
+}
+
+/**
+ * Check if the reDecorateBlocks() and buildBlock() are defined.
+ * @param {Function} buildBlock
+ * @param {Function} reDecorateBlocks
+ * @returns boolean
+ */
+function isRedecorateValid(buildBlock, reDecorateBlocks) {
+  if (typeof reDecorateBlocks === 'function' && typeof buildBlock === 'function') {
+    return true;
+  }
+  // eslint-disable-next-line no-console
+  console.warn('reDecorateBlocks() or buildBlock() is not defined.');
+  return false;
+}
+
+/**
  * Retrieves the content of metadata tags.
  * @param {String} name The metadata name (or property)
  * @returns {String} The metadata value(s)
@@ -709,6 +749,9 @@ async function runExperiment(document, pluginOptions) {
           variant,
         },
       }));
+      if (variant !== 'control' && isRedecorateValid(this.buildBlock, this.reDecorateBlocks)) {
+        this.reDecorateBlocks(rebuildIfHeroBlock(this.buildBlock, el));
+      }
     },
   );
 }
@@ -810,6 +853,9 @@ async function runCampaign(document, pluginOptions) {
           campaign,
         },
       }));
+      if (campaign !== 'default' && isRedecorateValid(this.buildBlock, this.reDecorateBlocks)) {
+        this.reDecorateBlocks(rebuildIfHeroBlock(this.buildBlock, el));
+      }
     },
   );
 }
@@ -892,6 +938,9 @@ async function serveAudience(document, pluginOptions) {
           audience,
         },
       }));
+      if (audience !== 'default' && isRedecorateValid(this.buildBlock, this.reDecorateBlocks)) {
+        this.reDecorateBlocks(rebuildIfHeroBlock(this.buildBlock, el));
+      }
     },
   );
 }
@@ -901,9 +950,9 @@ export async function loadEager(document, options = {}) {
   setDebugMode(window.location, pluginOptions);
 
   const ns = window.aem || window.hlx || {};
-  ns.audiences = await serveAudience(document, pluginOptions);
-  ns.experiments = await runExperiment(document, pluginOptions);
-  ns.campaigns = await runCampaign(document, pluginOptions);
+  ns.audiences = await serveAudience.call(this, document, pluginOptions);
+  ns.experiments = await runExperiment.call(this, document, pluginOptions);
+  ns.campaigns = await runCampaign.call(this, document, pluginOptions);
 
   // Backward compatibility
   ns.experiment = ns.experiments.find((e) => e.type === 'page');
