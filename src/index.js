@@ -905,9 +905,9 @@ export async function loadEager(document, options = {}) {
   setDebugMode(window.location, pluginOptions);
 
   const ns = window.aem || window.hlx || {};
-  ns.audiences = await serveAudience.call(this, document, pluginOptions);
-  ns.experiments = await runExperiment.call(this, document, pluginOptions);
-  ns.campaigns = await runCampaign.call(this, document, pluginOptions);
+  ns.audiences = await serveAudience(document, pluginOptions);
+  ns.experiments = await runExperiment(document, pluginOptions);
+  ns.campaigns = await runCampaign(document, pluginOptions);
 
   // Backward compatibility
   ns.experiment = ns.experiments.find((e) => e.type === 'page');
