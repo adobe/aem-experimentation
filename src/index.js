@@ -439,7 +439,7 @@ function watchMutationsAndApplyFragments(
       if (url && new URL(url, window.location.origin).pathname !== window.location.pathname) {
         // eslint-disable-next-line no-await-in-loop
         res = await replaceInner(new URL(url, window.location.origin).pathname, el, entry.selector);
-        pluginOptions.decorateFunction(el);
+        await pluginOptions.decorateFunction(el);
       } else {
         res = url;
       }
