@@ -43,6 +43,9 @@ export const DEFAULT_OPTIONS = {
   // Experimentation related properties
   experimentsMetaTagPrefix: 'experiment',
   experimentsQueryParameter: 'experiment',
+
+  // Redecoration function for fragments
+  decorateFunction: () => {},
 };
 
 /**
@@ -85,46 +88,6 @@ export function toCamelCase(name) {
 export function removeLeadingHyphens(inputString) {
   // Remove all leading hyphens which are converted from the space in metadata
   return inputString.replace(/^(-+)/, '');
-}
-
-/**
- * Check if the block is a hero block and rebuild it if needed.
- * @param {Function} buildBlock
- * @param {Element} el
- * @returns revised element
- */
-function rebuildIfHeroBlock(buildBlock, element) {
-  if (!element.classList.contains('hero')) return element;
-  const main = element.parentElement.parentElement;
-  [...element.children].reverse().forEach((el) => main.prepend(el));
-  element.remove();
-
-  // build hero block
-  const h1 = main.querySelector('main > div > h1');
-  const picture = main.querySelector('main > div > p > picture');
-  // eslint-disable-next-line no-bitwise
-  if (h1 && picture && (h1.compareDocumentPosition(picture) & Node.DOCUMENT_POSITION_PRECEDING)) {
-    const section = document.createElement('div');
-    section.append(buildBlock('hero', { elems: [picture, h1] }));
-    main.prepend(section);
-  }
-
-  return document.querySelector('.hero');
-}
-
-/**
- * Check if the reDecorateBlocks() and buildBlock() are defined.
- * @param {Function} buildBlock
- * @param {Function} reDecorateBlocks
- * @returns boolean
- */
-function isRedecorateValid(buildBlock, reDecorateBlocks) {
-  if (typeof reDecorateBlocks === 'function' && typeof buildBlock === 'function') {
-    return true;
-  }
-  // eslint-disable-next-line no-console
-  console.warn('reDecorateBlocks() or buildBlock() is not defined.');
-  return false;
 }
 
 /**
@@ -476,6 +439,7 @@ function watchMutationsAndApplyFragments(
       if (url && new URL(url, window.location.origin).pathname !== window.location.pathname) {
         // eslint-disable-next-line no-await-in-loop
         res = await replaceInner(new URL(url, window.location.origin).pathname, el, entry.selector);
+        pluginOptions.decorateFunction(el);
       } else {
         res = url;
       }
@@ -749,9 +713,6 @@ async function runExperiment(document, pluginOptions) {
           variant,
         },
       }));
-      if (variant !== 'control' && isRedecorateValid(this.buildBlock, this.reDecorateBlocks)) {
-        this.reDecorateBlocks(rebuildIfHeroBlock(this.buildBlock, el));
-      }
     },
   );
 }
@@ -853,9 +814,6 @@ async function runCampaign(document, pluginOptions) {
           campaign,
         },
       }));
-      if (campaign !== 'default' && isRedecorateValid(this.buildBlock, this.reDecorateBlocks)) {
-        this.reDecorateBlocks(rebuildIfHeroBlock(this.buildBlock, el));
-      }
     },
   );
 }
@@ -938,9 +896,6 @@ async function serveAudience(document, pluginOptions) {
           audience,
         },
       }));
-      if (audience !== 'default' && isRedecorateValid(this.buildBlock, this.reDecorateBlocks)) {
-        this.reDecorateBlocks(rebuildIfHeroBlock(this.buildBlock, el));
-      }
     },
   );
 }
