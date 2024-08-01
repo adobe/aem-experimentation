@@ -9,7 +9,6 @@
  * OF ANY KIND, either express or implied. See the License for the specific language
  * governing permissions and limitations under the License.
  */
-// eslint-disable-next-line import/no-cycle
 
 const DOMAIN_KEY_NAME = 'aem-domainkey';
 
@@ -18,7 +17,7 @@ class AemExperimentationBar extends HTMLElement {
     // Create a shadow root
     const shadow = this.attachShadow({ mode: 'open' });
 
-    const cssPathFromGithub ='https://opensource.adobe.com/aem-experimentation/preview.css';
+    const cssPathFromGithub = 'https://opensource.adobe.com/aem-experimentation/preview.css';
     const link = document.createElement('link');
     link.rel = 'stylesheet';
     link.href = cssPathFromGithub;
@@ -449,8 +448,13 @@ async function decorateExperimentPills(container, options) {
     return null;
   }
 
-  watchForAddedExperiences(ns.experiments, (c) => decorateExperimentPill.call(this, c, container, options));
-  return Promise.all(ns.experiments.map((c) => decorateExperimentPill.call(this, c, container, options)));
+  watchForAddedExperiences(
+    ns.experiments,
+    (c) => decorateExperimentPill.call(this, c, container, options),
+  );
+  return Promise.all(
+    ns.experiments.map((c) => decorateExperimentPill.call(this, c, container, options)),
+  );
 }
 
 function createCampaign(campaign, isSelected, options) {
