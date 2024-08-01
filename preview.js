@@ -18,7 +18,7 @@ class AemExperimentationBar extends HTMLElement {
     // Create a shadow root
     const shadow = this.attachShadow({ mode: 'open' });
 
-    const cssPathFromGithub ='https://adobe.github.io/aem-experimentation/preview.css';
+    const cssPathFromGithub ='https://opensource.adobe.com/aem-experimentation/preview.css';
     const link = document.createElement('link');
     link.rel = 'stylesheet';
     link.href = cssPathFromGithub;
