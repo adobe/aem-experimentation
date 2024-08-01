@@ -918,7 +918,7 @@ export async function loadLazy(document, options = {}) {
     return;
   }
   // eslint-disable-next-line import/no-cycle
-  const preview = await import('https://adobe.github.io/aem-experimentation/preview.js');
+  const preview = await import('https://opensource.adobe.com/aem-experimentation/preview.js');
   const context = {
     getMetadata,
     toClassName,
