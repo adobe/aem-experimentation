@@ -10,11 +10,6 @@
  * governing permissions and limitations under the License.
  */
 // eslint-disable-next-line import/no-cycle
-import {
-  debug,
-  getMetadata,
-  toClassName,
-} from './index.js';
 
 const DOMAIN_KEY_NAME = 'aem-domainkey';
 
@@ -23,10 +18,10 @@ class AemExperimentationBar extends HTMLElement {
     // Create a shadow root
     const shadow = this.attachShadow({ mode: 'open' });
 
-    const cssPath = new URL(new Error().stack.split('\n')[2].match(/[a-z]+?:\/\/.*?\/[^:]+/)[0]).pathname.replace('preview.js', 'preview.css');
+    const cssPathFromGithub ='https://adobe.github.io/aem-experimentation/preview.css';
     const link = document.createElement('link');
     link.rel = 'stylesheet';
-    link.href = cssPath;
+    link.href = cssPathFromGithub;
     link.onload = () => {
       shadow.querySelector('.hlx-preview-overlay').removeAttribute('hidden');
     };
@@ -374,11 +369,10 @@ async function decorateExperimentPill({ el, config }, container, options) {
     return;
   }
   // eslint-disable-next-line no-console
-  debug('preview experiment', config.id);
-
+  this.debug('preview experiment', config.id);
   const domainKey = window.localStorage.getItem(DOMAIN_KEY_NAME);
   const conversionName = (el.tagName === 'MAIN'
-    ? toClassName(getMetadata('conversion-name'))
+    ? this.toClassName(this.getMetadata('conversion-name'))
     : el.dataset.conversionName
   ) || 'click';
   const pill = createPopupButton(
@@ -437,7 +431,7 @@ async function decorateExperimentPill({ el, config }, container, options) {
     },
   );
   if (config.run) {
-    pill.classList.add(`is-${toClassName(config.status)}`);
+    pill.classList.add(`is-${this.toClassName(config.status)}`);
   }
   container.append(pill);
   const performanceMetrics = await fetchRumData(config.id, {
@@ -455,8 +449,8 @@ async function decorateExperimentPills(container, options) {
     return null;
   }
 
-  watchForAddedExperiences(ns.experiments, (c) => decorateExperimentPill(c, container, options));
-  return Promise.all(ns.experiments.map((c) => decorateExperimentPill(c, container, options)));
+  watchForAddedExperiences(ns.experiments, (c) => decorateExperimentPill.call(this, c, container, options));
+  return Promise.all(ns.experiments.map((c) => decorateExperimentPill.call(this, c, container, options)));
 }
 
 function createCampaign(campaign, isSelected, options) {
@@ -604,7 +598,7 @@ export default async function decoratePreviewMode(document, options) {
 
     await decorateAudiencesPills(overlay, options);
     await decorateCampaignPills(overlay, options);
-    await decorateExperimentPills(overlay, options);
+    await decorateExperimentPills.call(this, overlay, options);
   } catch (e) {
     // eslint-disable-next-line no-console
     console.log(e);
