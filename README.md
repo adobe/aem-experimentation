@@ -142,7 +142,7 @@ You have already seen the `audiences` option in the examples above, but here is 
 
 ```js
 runEager.call(document, {
-  // Lets you configure the prod environment.
+  // Let you configure the prod environment.
   // (prod environments do not get the pill overlay)
   prodHost: 'www.my-website.com',
   // if you have several, or need more complex logic to toggle pill overlay, you can use
@@ -168,6 +168,14 @@ runEager.call(document, {
   // See more details on the dedicated Experiments page linked below
   experimentsMetaTagPrefix: 'experiment',
   experimentsQueryParameter: 'experiment',
+
+  /* Fragment experiment needs redecoration */
+  // See more details below
+  decorationFunction: (el) => {
+    /* handle custom decoration here, for example: */
+    buildBlock(el);
+    decorateBlock(el);
+  }
 });
 ```
 
@@ -175,6 +183,13 @@ For detailed implementation instructions on the different features, please read 
 - [Audiences](/documentation/audiences.md)
 - [Campaigns](/documentation/campaigns.md)
 - [Experiments](/documentation/experiments.md)
+
+**Cases of passing `decorationFunction`**
+Fragment replacement is handled by async observer, which may execute before or after default decoration complete. Therefore, the project needs to provide a decoration method. There are several common cases:
+1. Have a selector for an element inside a block and the block needs to be redecorated => sample code above
+2. Have a `.block` selector and  need to redecorate => switch block status to `"loading"` and call `loadBlock(el)`
+3. Have a `.section` selector and need to redecorate => call `decorateBlocks(el)`
+4. Have a `main` selector and need to redecorate => call `decorateMain(el)`
 
 ## Extensibility & integrations
 
