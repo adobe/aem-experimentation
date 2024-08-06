@@ -600,8 +600,11 @@ async function getExperimentConfig(pluginOptions, metadata, overrides) {
     label: 'Control',
   };
 
-  // get the custom labels for the variants names
-  const labelNames = stringToArray(metadata.name);
+  // get the customized name for the variant in page metadata and manifest
+  const labelNames = stringToArray(metadata.name)?.length
+    ? stringToArray(metadata.name)
+    : stringToArray(depluralizeProps(metadata, ['variantName']).variantName);
+
   pages.forEach((page, i) => {
     const vname = `challenger-${i + 1}`;
     //  label with custom name or default
