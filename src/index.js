@@ -43,6 +43,9 @@ export const DEFAULT_OPTIONS = {
   // Experimentation related properties
   experimentsMetaTagPrefix: 'experiment',
   experimentsQueryParameter: 'experiment',
+
+  // Redecoration function for fragments
+  decorateFunction: () => {},
 };
 
 /**
@@ -436,6 +439,8 @@ function watchMutationsAndApplyFragments(
       if (url && new URL(url, window.location.origin).pathname !== window.location.pathname) {
         // eslint-disable-next-line no-await-in-loop
         res = await replaceInner(new URL(url, window.location.origin).pathname, el, entry.selector);
+        // eslint-disable-next-line no-await-in-loop
+        await pluginOptions.decorateFunction(el);
       } else {
         res = url;
       }
