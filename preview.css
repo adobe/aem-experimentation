@@ -200,7 +200,7 @@
 
 .hlx-badge.is-active,
 .hlx-badge[aria-pressed="true"] {
-  --color: rgb#280;
+  --color: #280;
 }
 
 .hlx-badge.is-inactive,
