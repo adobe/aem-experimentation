@@ -72,6 +72,33 @@ export function toClassName(name) {
 }
 
 /**
+ * Fires a Real User Monitoring (RUM) event based on the provided type and configuration.
+ * @param {string} type - the type of event to be fired ("experiment", "campaign", or "audience")
+ * @param {Object} config - contains details about the experience
+ * @param {Object} pluginOptions - default plugin options with custom options
+ * @param {string} result - the URL of the served experience.
+ */
+function fireRUM(type, config, pluginOptions, result) {
+  const sampleData = {
+    experiment: {
+      source: config.id,
+      target: result ? config.selectedVariant : config.variantNames[0],
+    },
+    campaign: {
+      source: result ? toClassName(config.selectedCampaign) : 'default',
+      target: Object.keys(pluginOptions.audiences).join(':'),
+    },
+    audience: {
+      source: result ? toClassName(config.selectedAudience) : 'default',
+      target: Object.keys(pluginOptions.audiences).join(':'),
+    },
+  };
+
+  const rumType = type === 'experiment' ? 'experiment' : 'audience';
+  window.hlx?.rum?.sampleRUM(rumType, sampleData[type]);
+}
+
+/**
  * Sanitizes a name for use as a js property name.
  * @param {String} name The unsanitized name
  * @returns {String} The camelCased name
@@ -321,6 +348,7 @@ function toDecisionPolicy(config) {
  * Creates an instance of a modification handler that will be responsible for applying the desired
  * personalized experience.
  *
+ * @param {String} type The type of modifications to apply
  * @param {Object} overrides The config overrides
  * @param {Function} metadataToConfig a function that will handle the parsing of the metadata
  * @param {Function} getExperienceUrl a function that returns the URL to the experience
@@ -329,6 +357,7 @@ function toDecisionPolicy(config) {
  * @returns the modification handler
  */
 function createModificationsHandler(
+  type,
   overrides,
   metadataToConfig,
   getExperienceUrl,
@@ -344,8 +373,13 @@ function createModificationsHandler(
     const url = await getExperienceUrl(ns.config);
     let res;
     if (url && new URL(url, window.location.origin).pathname !== window.location.pathname) {
-      // eslint-disable-next-line no-await-in-loop
-      res = await replaceInner(new URL(url, window.location.origin).pathname, el);
+      if (metadata?.resolution === 'redirect') {
+        fireRUM(type, config, pluginOptions, url);
+        window.location.replace(url);
+      } else {
+        // eslint-disable-next-line no-await-in-loop
+        res = await replaceInner(new URL(url, window.location.origin).pathname, el);
+      }
     } else {
       res = url;
     }
@@ -479,6 +513,7 @@ async function applyAllModifications(
   cb,
 ) {
   const modificationsHandler = createModificationsHandler(
+    type,
     getAllQueryParameters(paramNS),
     metadataToConfig,
     getExperienceUrl,
@@ -699,16 +734,14 @@ async function runExperiment(document, pluginOptions) {
     parseExperimentManifest,
     getUrlFromExperimentConfig,
     (el, config, result) => {
+      fireRUM('experiment', config, pluginOptions, result);
+      // dispatch event
       const { id, selectedVariant, variantNames } = config;
       const variant = result ? selectedVariant : variantNames[0];
       el.dataset.experiment = id;
       el.dataset.variant = variant;
       el.classList.add(`experiment-${toClassName(id)}`);
       el.classList.add(`variant-${toClassName(variant)}`);
-      window.hlx?.rum?.sampleRUM('experiment', {
-        source: id,
-        target: variant,
-      });
       document.dispatchEvent(new CustomEvent('aem:experimentation', {
         detail: {
           element: el,
@@ -802,15 +835,13 @@ async function runCampaign(document, pluginOptions) {
     parseCampaignManifest,
     getUrlFromCampaignConfig,
     (el, config, result) => {
+      fireRUM('campaign', config, pluginOptions, result);
+      // dispatch event
       const { selectedCampaign = 'default' } = config;
       const campaign = result ? toClassName(selectedCampaign) : 'default';
       el.dataset.audience = selectedCampaign;
       el.dataset.audiences = Object.keys(pluginOptions.audiences).join(',');
       el.classList.add(`campaign-${campaign}`);
-      window.hlx?.rum?.sampleRUM('audience', {
-        source: campaign,
-        target: Object.keys(pluginOptions.audiences).join(':'),
-      });
       document.dispatchEvent(new CustomEvent('aem:experimentation', {
         detail: {
           element: el,
@@ -885,14 +916,12 @@ async function serveAudience(document, pluginOptions) {
     parseAudienceManifest,
     getUrlFromAudienceConfig,
     (el, config, result) => {
+      fireRUM('audience', config, pluginOptions, result);
+      // dispatch event
       const { selectedAudience = 'default' } = config;
       const audience = result ? toClassName(selectedAudience) : 'default';
       el.dataset.audience = audience;
       el.classList.add(`audience-${audience}`);
-      window.hlx?.rum?.sampleRUM('audience', {
-        source: audience,
-        target: Object.keys(pluginOptions.audiences).join(':'),
-      });
       document.dispatchEvent(new CustomEvent('aem:experimentation', {
         detail: {
           element: el,
