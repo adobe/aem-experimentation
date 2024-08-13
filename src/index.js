@@ -378,7 +378,7 @@ function createModificationsHandler(
         fireRUM(type, config, pluginOptions, url);
         window.location.replace(url);
         // eslint-disable-next-line consistent-return
-        return;
+        return ns;
       }
       // eslint-disable-next-line no-await-in-loop
       res = await replaceInner(new URL(url, window.location.origin).pathname, el);
