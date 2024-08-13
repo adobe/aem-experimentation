@@ -373,13 +373,14 @@ function createModificationsHandler(
     const url = await getExperienceUrl(ns.config);
     let res;
     if (url && new URL(url, window.location.origin).pathname !== window.location.pathname) {
-      if (metadata?.resolution === 'redirect') {
+      if (toClassName(metadata?.resolution) === 'redirect') {
+        // Firing RUM event early since redirection will stop the rest of the JS execution
         fireRUM(type, config, pluginOptions, url);
         window.location.replace(url);
-      } else {
-        // eslint-disable-next-line no-await-in-loop
-        res = await replaceInner(new URL(url, window.location.origin).pathname, el);
+        return null;
       }
+      // eslint-disable-next-line no-await-in-loop
+      res = await replaceInner(new URL(url, window.location.origin).pathname, el);
     } else {
       res = url;
     }
