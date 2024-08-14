@@ -79,23 +79,26 @@ export function toClassName(name) {
  * @param {string} result - the URL of the served experience.
  */
 function fireRUM(type, config, pluginOptions, result) {
-  const sampleData = {
-    experiment: {
+  const { selectedCampaign = 'default', selectedAudience = 'default' } = config;
+
+  const typeHandlers = {
+    experiment: () => ({
       source: config.id,
       target: result ? config.selectedVariant : config.variantNames[0],
-    },
-    campaign: {
-      source: result ? toClassName(config.selectedCampaign) : 'default',
+    }),
+    campaign: () => ({
+      source: result ? toClassName(selectedCampaign) : 'default',
       target: Object.keys(pluginOptions.audiences).join(':'),
-    },
-    audience: {
-      source: result ? toClassName(config.selectedAudience) : 'default',
+    }),
+    audience: () => ({
+      source: result ? toClassName(selectedAudience) : 'default',
       target: Object.keys(pluginOptions.audiences).join(':'),
-    },
+    }),
   };
 
+  const { source, target } = typeHandlers[type]();
   const rumType = type === 'experiment' ? 'experiment' : 'audience';
-  window.hlx?.rum?.sampleRUM(rumType, sampleData[type]);
+  window.hlx?.rum?.sampleRUM(rumType, { source, target });
 }
 
 /**
@@ -378,7 +381,7 @@ function createModificationsHandler(
         fireRUM(type, config, pluginOptions, url);
         window.location.replace(url);
         // eslint-disable-next-line consistent-return
-        return ns;
+        return;
       }
       // eslint-disable-next-line no-await-in-loop
       res = await replaceInner(new URL(url, window.location.origin).pathname, el);
