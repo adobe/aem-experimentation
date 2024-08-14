@@ -128,6 +128,23 @@ Start and end dates are in the flexible JS [Date Time String Format](https://tc3
 
 So you can both use generic dates, like `2024-01-31` or `2024/01/31`, and time-specific dates like `2024-01-31T13:37` or `2024/01/31 1:37 pm`. You can even enforce a specific timezone so your experiment activates when, say, it's 2am GMT+1 by using `2024/1/31 2:00 pm GMT+1` or similar notations.
 
+#### Redirect page experiments
+For the use case that fully redirect to the target URL instead of just replacing the content (our default behavior), you could add a new property `Experiment Resolution | redirect` in page metadata:
+| Metadata              |                                                              |
+|-----------------------|--------------------------------------------------------------|
+| Experiment            | Hero Test                                                    |
+| Experiment Variants   | [https://{ref}--{repo}--{org}.hlx.page/my-page-variant-1](), [https://{ref}--{repo}--{org}.hlx.page/my-page-variant-2](), [https://{ref}--{repo}--{org}.hlx.page/my-page-variant-3]() |
+| Experiment Resolution     | redirect
+
+In this example, the Hero Test experiment will redirect to one of the specified URLs when you simulate that variant.
+
+Similarly, the redirects for audience personalization and campaign personalization could be enabled by adding:
+
+`Audience Resolution | redirect`
+`Campaign Resolution | redirect`
+
+For more details, refer to: [audiences](./audiences.md#page-redirect), [campaigns](./campaigns.md#page-redirect)
+
 ### Section-level experiments
 
 Each section in a page can also run 1 experiment, so you can have as many section-level experiments as you have sections.
