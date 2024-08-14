@@ -70,6 +70,16 @@ The audiences are set up directly in the page metadata block as follows:
 
 The notation is pretty flexible and authors can also use `Audience (Mobile)` or `Audience Mobile` if this is a preferred notation.
 
+#### Page redirect
+
+If you aim to direct your audience to a target URL instead of just replacing the content, you can do so by adding the `Audience Resolution | redirect` property to the page metadata:
+
+| Metadata            |                                                               |
+|---------------------|---------------------------------------------------------------|
+| Audience: Mobile    | [https://{ref}--{repo}--{org}.hlx.page/my-page-for-mobile]()  |
+| Audience: Desktop   | [https://{ref}--{repo}--{org}.hlx.page/my-page-for-desktop]() |
+| Audience Resolution | redirect                                                      |
+
 ### Section-level audiences
 
 Each section in a page can also run any number of audiences. Section-level audiences are run after the page-level audiences have run, i.e. after the variants have been processed and their markup was pulled into the main page, so the section-level audiences that will run are dictated by the document from the current page-level experiment/audience/campaign, and not necessarily just the main page.
