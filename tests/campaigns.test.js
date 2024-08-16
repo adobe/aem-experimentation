@@ -75,6 +75,18 @@ test.describe('Page-level campaigns', () => {
     ]);
   });
 
+  test("Track page is redirected.", async ({ page }) => {
+    await page.goto(
+      "/tests/fixtures/campaigns/page-level--redirect"
+    );
+    const targetUrl = [
+      "/tests/fixtures/campaigns/page-level--redirect",
+      "/tests/fixtures/campaigns/page-level-v1",
+      "/tests/fixtures/campaigns/page-level-v2",
+    ];
+    expect(targetUrl).toContain(new URL(page.url()).pathname);
+  });
+
   test('Exposes the campaign in a JS API.', async ({ page }) => {
     await goToAndRunCampaign(page, '/tests/fixtures/campaigns/page-level?campaign=bar');
     expect(await page.evaluate(() => window.hlx.campaigns)).toContainEqual(

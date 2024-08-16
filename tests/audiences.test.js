@@ -65,6 +65,18 @@ test.describe('Page-level audiences', () => {
     ]);
   });
 
+  test("Track page is redirected.", async ({ page }) => {
+    await page.goto(
+      "/tests/fixtures/audiences/page-level--redirect"
+    );
+    const targetUrl = [
+      "/tests/fixtures/audiences/page-level--redirect",
+      "/tests/fixtures/audiences/page-level-v1",
+      "/tests/fixtures/audiences/page-level-v2",
+    ];
+    expect(targetUrl).toContain(new URL(page.url()).pathname);
+  });
+
   test('Exposes the audiences in a JS API.', async ({ page }) => {
     await goToAndRunAudience(page, '/tests/fixtures/audiences/page-level');
     expect(await page.evaluate(() => window.hlx.audiences)).toContainEqual(

@@ -117,6 +117,18 @@ test.describe('Page-level experiments', () => {
     ]);
   });
 
+    test("Track page is redirected.", async ({ page }) => {
+      await page.goto(
+        "/tests/fixtures/experiments/page-level--redirect"
+      );
+      const targetUrl = [
+        "/tests/fixtures/experiments/page-level--redirect",
+        "/tests/fixtures/experiments/page-level-v1",
+        "/tests/fixtures/experiments/page-level-v2",
+      ];
+      expect(targetUrl).toContain(new URL(page.url()).pathname);
+    });
+
   test('Exposes the experiment in a JS API.', async ({ page }) => {
     await goToAndRunExperiment(page, '/tests/fixtures/experiments/page-level');
     expect(await page.evaluate(() => window.hlx.experiments)).toContainEqual(
