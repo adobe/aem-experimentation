@@ -136,7 +136,7 @@ For the use case that fully redirect to the target URL instead of just replacing
 | Experiment Variants   | [https://{ref}--{repo}--{org}.hlx.page/my-page-variant-1](), [https://{ref}--{repo}--{org}.hlx.page/my-page-variant-2](), [https://{ref}--{repo}--{org}.hlx.page/my-page-variant-3]() |
 | Experiment Resolution     | redirect
 
-In this example, the Hero Test experiment will redirect to one of the specified URLs when you simulate that variant.
+In this example, the Hero Test experiment will redirect to one of the specified URLs based on the selected variant.
 
 Similarly, the redirects for audience personalization and campaign personalization could be enabled by adding:
 
