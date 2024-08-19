@@ -117,24 +117,24 @@ test.describe('Page-level experiments', () => {
     ]);
   });
 
-    test('Track RUM is fired before redirect.', async ({ page }) => {
-      const rumCalls = [];
-      await page.exposeFunction('logRumCall', (...args) => rumCalls.push(args));
-      await page.addInitScript(() => {
-        window.hlx = { rum: { sampleRUM: (...args) => window.logRumCall(args) } };
-      });
-      await page.goto('/tests/fixtures/experiments/page-level--redirect');
-      await page.waitForURL(/\/tests\/fixtures\/experiments\/page-level(--redirect|-v[12])$/); 
-      expect(await page.evaluate(() => window.document.body.innerText)).toMatch(/Hello (v[12]|World)!/);
-      expect(rumCalls[0]).toContainEqual([
-        'experiment',
-        {
-          source: 'foo',
-          target: expect.stringMatching(/control|challenger-1|challenger-2/),
-        },
-      ]);      
+  test('Track RUM is fired before redirect.', async ({ page }) => {
+    const rumCalls = [];
+    await page.exposeFunction('logRumCall', (...args) => rumCalls.push(args));
+    await page.addInitScript(() => {
+      window.hlx = { rum: { sampleRUM: (...args) => window.logRumCall(args) } };
     });
-    
+    await page.goto('/tests/fixtures/experiments/page-level--redirect?experiment=foo/challenger-1');
+    await page.waitForURL('/tests/fixtures/experiments/page-level-v1');
+    expect(await page.evaluate(() => window.document.body.innerText)).toMatch(/Hello v1!/);
+    expect(rumCalls[0]).toContainEqual([
+      'experiment',
+      {
+        source: 'foo',
+        target: 'challenger-1',
+      },
+    ]);
+  });
+
   test('Exposes the experiment in a JS API.', async ({ page }) => {
     await goToAndRunExperiment(page, '/tests/fixtures/experiments/page-level');
     expect(await page.evaluate(() => window.hlx.experiments)).toContainEqual(
