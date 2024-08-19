@@ -117,6 +117,38 @@ test.describe('Page-level experiments', () => {
     ]);
   });
 
+  test('Track RUM is fired before redirect.', async ({ page }) => {
+    await page.addInitScript(() => {
+      window.rumCalls = [];
+      window.hlx = { rum: { sampleRUM: (...args) => window.rumCalls.push(args) } };
+    });
+    // Intercept script
+    await page.route('src/index.js', async (route) => {
+      const response = await route.fetch();
+      let body = await response.text();
+      if (body.includes('window.location.replace')) {
+        // Commnet out the call of window.location.replace
+        body = body.replace(/window\.location\.replace\s*\(/g, '//window.location.replace(');
+      }
+      await route.fulfill({
+        response,
+        body,
+        headers: {
+          ...response.headers(),
+          'content-length': String(body.length),
+        },
+      });
+    });
+    await goToAndRunExperiment(page, '/tests/fixtures/experiments/page-level--redirect');
+    expect(await page.evaluate(() => window.rumCalls)).toContainEqual([
+      'experiment',
+      expect.objectContaining({
+        source: 'foo',
+        target: expect.stringMatching(/control|challenger-1|challenger-2/),
+      }),
+    ]);
+  });
+
     test("Track page is redirected.", async ({ page }) => {
       await page.goto(
         "/tests/fixtures/experiments/page-level--redirect"

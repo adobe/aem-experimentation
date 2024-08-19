@@ -65,6 +65,38 @@ test.describe('Page-level audiences', () => {
     ]);
   });
 
+  test('Track RUM is fired before redirect.', async ({ page }) => {
+    await page.addInitScript(() => {
+      window.rumCalls = [];
+      window.hlx = { rum: { sampleRUM: (...args) => window.rumCalls.push(args) } };
+    });
+    // Intercept the script
+    await page.route('src/index.js', async (route) => {
+      const response = await route.fetch();
+      let body = await response.text();
+      if (body.includes('window.location.replace')) {
+        // Comment out the redirect
+        body = body.replace(/window\.location\.replace\s*\(/g, '//window.location.replace(');
+      }
+      await route.fulfill({
+        response,
+        body,
+        headers: {
+          ...response.headers(),
+          'content-length': String(body.length),
+        },
+      });
+    });
+    await goToAndRunAudience(page, '/tests/fixtures/audiences/page-level--redirect');
+    expect(await page.evaluate(() => window.rumCalls)).toContainEqual([
+      'audience',
+      expect.objectContaining({
+        source: 'foo',
+        target: 'foo:bar',
+      }),
+    ]);
+  });
+
   test("Track page is redirected.", async ({ page }) => {
     await page.goto('/tests/fixtures/audiences/page-level--redirect');
     const targetUrls = [
