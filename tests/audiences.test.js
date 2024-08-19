@@ -65,50 +65,22 @@ test.describe('Page-level audiences', () => {
     ]);
   });
 
-  test('Track RUM is fired before redirect.', async ({ page }) => {
-    await page.addInitScript(() => {
-      window.rumCalls = [];
-      window.hlx = { rum: { sampleRUM: (...args) => window.rumCalls.push(args) } };
-    });
-    // Intercept the script
-    await page.route('src/index.js', async (route) => {
-      const response = await route.fetch();
-      let body = await response.text();
-      if (body.includes('window.location.replace')) {
-        // Comment out the redirect
-        body = body.replace(/window\.location\.replace\s*\(/g, '//window.location.replace(');
-      }
-      await route.fulfill({
-        response,
-        body,
-        headers: {
-          ...response.headers(),
-          'content-length': String(body.length),
-        },
-      });
-    });
-    await goToAndRunAudience(page, '/tests/fixtures/audiences/page-level--redirect');
-    expect(await page.evaluate(() => window.rumCalls)).toContainEqual([
-      'audience',
-      expect.objectContaining({
-        source: 'foo',
-        target: 'foo:bar',
-      }),
-    ]);
+test('Track RUM is fired before redirect.', async ({ page }) => {
+  const rumCalls = [];
+  await page.exposeFunction('logRumCall', (...args) => rumCalls.push(args));
+  await page.addInitScript(() => {
+    window.hlx = { rum: { sampleRUM: (...args) => window.logRumCall(args) } };
   });
-
-  test("Track page is redirected.", async ({ page }) => {
-    await page.goto('/tests/fixtures/audiences/page-level--redirect');
-    const targetUrls = [
-        '/tests/fixtures/audiences/variant-1',
-        '/tests/fixtures/audiences/variant-2',
-    ];
-    await page.waitForFunction(
-        (targetUrls) => targetUrls.includes(window.location.pathname),
-        targetUrls
-    );
-    const currentPath = new URL(page.url()).pathname;
-    expect(targetUrls).toContain(currentPath);
+  await page.goto('/tests/fixtures/audiences/page-level--redirect');
+  await page.waitForURL('/tests/fixtures/audiences/variant-1');
+  expect(await page.evaluate(() => window.document.body.innerText)).toEqual('Hello v1!');
+  expect(rumCalls[0]).toContainEqual([
+    'audience',
+    {
+      source: 'foo',
+      target: 'foo:bar',
+    },
+  ]);
 });
 
   test('Exposes the audiences in a JS API.', async ({ page }) => {

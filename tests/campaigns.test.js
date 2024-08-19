@@ -75,42 +75,22 @@ test.describe('Page-level campaigns', () => {
     ]);
   });
 
-  test('Tracks RUM is fired before redirect.', async ({ page }) => {
+  test('Track RUM is fired before redirect.', async ({ page }) => {
+    const rumCalls = [];
+    await page.exposeFunction('logRumCall', (...args) => rumCalls.push(args));
     await page.addInitScript(() => {
-      window.rumCalls = [];
-      window.hlx = { rum: { sampleRUM: (...args) => window.rumCalls.push(args) } };
+      window.hlx = { rum: { sampleRUM: (...args) => window.logRumCall(args) } };
     });
-    // Intercept script
-    await page.route('src/index.js', async (route) => {
-      const response = await route.fetch();
-      let body = await response.text();
-      if (body.includes('window.location.replace')) {
-        // Comment out the redirect
-        body = body.replace(/window\.location\.replace\s*\(/g, '//window.location.replace(');
-      }
-      await route.fulfill({
-        response,
-        body,
-        headers: {
-          ...response.headers(),
-          'content-length': String(body.length),
-        },
-      });
-    });
-    await goToAndRunCampaign(page, '/tests/fixtures/campaigns/page-level--redirect?campaign=foo');
-    expect(await page.evaluate(() => window.rumCalls)).toContainEqual([
-      'audience',
-      expect.objectContaining({
-        source: 'foo',
-        target: 'foo:bar',
-      }),
-    ]);
-  });
-
-  test("Track page is redirected.", async ({ page }) => {
     await page.goto('/tests/fixtures/campaigns/page-level--redirect?campaign=bar');
     await page.waitForURL('/tests/fixtures/campaigns/variant-2');
-    expect(new URL(page.url()).pathname).toBe('/tests/fixtures/campaigns/variant-2');
+    expect(await page.evaluate(() => window.document.body.innerText)).toEqual('Hello v2!');
+    expect(rumCalls[0]).toContainEqual([
+      'audience',
+      {
+        source: 'bar',
+        target: 'foo:bar',
+      },
+    ]);
   });
 
   test('Exposes the campaign in a JS API.', async ({ page }) => {

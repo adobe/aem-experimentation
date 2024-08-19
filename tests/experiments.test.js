@@ -117,50 +117,24 @@ test.describe('Page-level experiments', () => {
     ]);
   });
 
-  test('Track RUM is fired before redirect.', async ({ page }) => {
-    await page.addInitScript(() => {
-      window.rumCalls = [];
-      window.hlx = { rum: { sampleRUM: (...args) => window.rumCalls.push(args) } };
-    });
-    // Intercept script
-    await page.route('src/index.js', async (route) => {
-      const response = await route.fetch();
-      let body = await response.text();
-      if (body.includes('window.location.replace')) {
-        // Commnet out the call of window.location.replace
-        body = body.replace(/window\.location\.replace\s*\(/g, '//window.location.replace(');
-      }
-      await route.fulfill({
-        response,
-        body,
-        headers: {
-          ...response.headers(),
-          'content-length': String(body.length),
-        },
+    test('Track RUM is fired before redirect.', async ({ page }) => {
+      const rumCalls = [];
+      await page.exposeFunction('logRumCall', (...args) => rumCalls.push(args));
+      await page.addInitScript(() => {
+        window.hlx = { rum: { sampleRUM: (...args) => window.logRumCall(args) } };
       });
+      await page.goto('/tests/fixtures/experiments/page-level--redirect');
+      await page.waitForURL(/\/tests\/fixtures\/experiments\/page-level(--redirect|-v[12])$/); 
+      expect(await page.evaluate(() => window.document.body.innerText)).toMatch(/Hello (v[12]|World)!/);
+      expect(rumCalls[0]).toContainEqual([
+        'experiment',
+        {
+          source: 'foo',
+          target: expect.stringMatching(/control|challenger-1|challenger-2/),
+        },
+      ]);      
     });
-    await goToAndRunExperiment(page, '/tests/fixtures/experiments/page-level--redirect');
-    expect(await page.evaluate(() => window.rumCalls)).toContainEqual([
-      'experiment',
-      expect.objectContaining({
-        source: 'foo',
-        target: expect.stringMatching(/control|challenger-1|challenger-2/),
-      }),
-    ]);
-  });
-
-    test("Track page is redirected.", async ({ page }) => {
-      await page.goto(
-        "/tests/fixtures/experiments/page-level--redirect"
-      );
-      const targetUrl = [
-        "/tests/fixtures/experiments/page-level--redirect",
-        "/tests/fixtures/experiments/page-level-v1",
-        "/tests/fixtures/experiments/page-level-v2",
-      ];
-      expect(targetUrl).toContain(new URL(page.url()).pathname);
-    });
-
+    
   test('Exposes the experiment in a JS API.', async ({ page }) => {
     await goToAndRunExperiment(page, '/tests/fixtures/experiments/page-level');
     expect(await page.evaluate(() => window.hlx.experiments)).toContainEqual(
