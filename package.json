@@ -3,7 +3,7 @@
   "version": "1.0.1",
   "main": "src/index.js",
   "scripts": {
-    "lint:js": "eslint src",
+    "lint:js": "eslint src tests",
     "lint:css": "stylelint src/**/*.css --allow-empty-input",
     "lint": "npm run lint:js && npm run lint:css",
     "start": "http-server . -p 3000",

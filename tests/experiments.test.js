@@ -117,6 +117,40 @@ test.describe('Page-level experiments', () => {
     ]);
   });
 
+  test('Track RUM is fired before redirect', async ({ page }) => {
+    const rumCalls = [];
+    await page.exposeFunction('logRumCall', (...args) => rumCalls.push(args));
+    await page.addInitScript(() => {
+      window.hlx = { rum: { sampleRUM: (...args) => window.logRumCall(args) } };
+    });
+    await page.goto('/tests/fixtures/experiments/page-level--redirect');
+    await page.waitForFunction(() => window.hlx.rum.sampleRUM);
+    expect(rumCalls[0]).toContainEqual([
+      'experiment',
+      {
+        source: 'foo',
+        target: expect.stringMatching(/control|challenger-1|challenger-2/),
+      },
+    ]);
+
+    const expectedContent = {
+      v1: 'Hello v1!',
+      v2: 'Hello v2!',
+      redirect: 'Hello World!',
+    };
+    const expectedUrlPath = {
+      v1: '/tests/fixtures/experiments/page-level-v1',
+      v2: '/tests/fixtures/experiments/page-level-v2',
+      redirect: '/tests/fixtures/experiments/page-level--redirect',
+    };
+    const url = new URL(page.url());
+    const variant = Object.keys(expectedUrlPath).find((k) => url.pathname.endsWith(k));
+    expect(await page.evaluate(() => window.document.body.innerText)).toMatch(
+      new RegExp(expectedContent[variant]),
+    );
+    expect(expectedUrlPath[variant]).toBe(url.pathname);
+  });
+
   test('Exposes the experiment in a JS API.', async ({ page }) => {
     await goToAndRunExperiment(page, '/tests/fixtures/experiments/page-level');
     expect(await page.evaluate(() => window.hlx.experiments)).toContainEqual(

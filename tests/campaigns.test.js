@@ -75,6 +75,24 @@ test.describe('Page-level campaigns', () => {
     ]);
   });
 
+  test('Track RUM is fired before redirect.', async ({ page }) => {
+    const rumCalls = [];
+    await page.exposeFunction('logRumCall', (...args) => rumCalls.push(args));
+    await page.addInitScript(() => {
+      window.hlx = { rum: { sampleRUM: (...args) => window.logRumCall(args) } };
+    });
+    await page.goto('/tests/fixtures/campaigns/page-level--redirect?campaign=bar');
+    await page.waitForURL('/tests/fixtures/campaigns/variant-2');
+    expect(await page.evaluate(() => window.document.body.innerText)).toEqual('Hello v2!');
+    expect(rumCalls[0]).toContainEqual([
+      'audience',
+      {
+        source: 'bar',
+        target: 'foo:bar',
+      },
+    ]);
+  });
+
   test('Exposes the campaign in a JS API.', async ({ page }) => {
     await goToAndRunCampaign(page, '/tests/fixtures/campaigns/page-level?campaign=bar');
     expect(await page.evaluate(() => window.hlx.campaigns)).toContainEqual(
