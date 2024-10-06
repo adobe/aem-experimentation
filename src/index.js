@@ -72,6 +72,21 @@ export function toClassName(name) {
 }
 
 /**
+ * Triggers the callback when the page is actually activated,
+ * This is to properly handle speculative page prerendering and marketing events.
+ * @param {Function} cb The callback to run
+ */
+async function onPageActivation(cb) {
+  // Speculative prerender-aware execution.
+  // See: https://developer.mozilla.org/en-US/docs/Web/API/Speculation_Rules_API#unsafe_prerendering
+  if (document.prerendering) {
+    document.addEventListener('prerenderingchange', cb, { once: true });
+  } else {
+    cb();
+  }
+}
+
+/**
  * Fires a Real User Monitoring (RUM) event based on the provided type and configuration.
  * @param {string} type - the type of event to be fired ("experiment", "campaign", or "audience")
  * @param {Object} config - contains details about the experience
@@ -98,7 +113,9 @@ function fireRUM(type, config, pluginOptions, result) {
 
   const { source, target } = typeHandlers[type]();
   const rumType = type === 'experiment' ? 'experiment' : 'audience';
-  window.hlx?.rum?.sampleRUM(rumType, { source, target });
+  onPageActivation(() => {
+    window.hlx?.rum?.sampleRUM(rumType, { source, target });
+  });
 }
 
 /**
