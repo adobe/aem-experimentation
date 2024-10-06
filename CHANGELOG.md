@@ -1,3 +1,10 @@
+## [1.0.3](https://github.com/adobe/aem-experimentation/compare/v1.0.2...v1.0.3) (2024-10-06)
+
+
+### Bug Fixes
+
+* regressions from prerendering logic and experimeantation ([5b90510](https://github.com/adobe/aem-experimentation/commit/5b90510168be9f9b55fc71e9c227cadaf481b968))
+
 ## [1.0.2](https://github.com/adobe/aem-experimentation/compare/v1.0.1...v1.0.2) (2024-06-11)
 
 
