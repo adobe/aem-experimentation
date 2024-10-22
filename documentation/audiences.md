@@ -3,7 +3,7 @@ With audiences you can serve different versions of your content to different gro
 - Chrome vs. Firefox
 - [1st vs. returning visitor](https://github.com/hlxsites/wknd/blob/main/scripts/scripts.js#L33-L34)
 - [fast vs slow connections](https://developer.mozilla.org/en-US/docs/Web/API/NetworkInformation/effectiveType)
-- different geographies via [Geolocation API](https://github.com/hlxsites/wknd/blob/main/scripts/scripts.js#L33-L34) or CDN workers ([Fastly]8https://www.fastly.com/documentation/reference/vcl/variables/geolocation/), [Cloudflare](https://developers.cloudflare.com/workers/examples/geolocation-hello-world/))
+- different geographies via [Geolocation API](https://github.com/hlxsites/wknd/blob/main/scripts/scripts.js#L33-L34) or CDN workers ([Fastly](https://www.fastly.com/documentation/reference/vcl/variables/geolocation/), [Cloudflare](https://developers.cloudflare.com/workers/examples/geolocation-hello-world/))
 - etc.
 
 ## Set up
