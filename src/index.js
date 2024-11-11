@@ -543,13 +543,9 @@ async function applyAllModifications(
   const configs = [];
 
   let dataList = await getAllDataAttributes(document, type);
-  console.log("xinyiyyyyydocument,tyle", document, type);
-  // dataList = dataList.slice(1,2);
     // Fragment-level modifications
   if (dataList.length) {
-    console.log("111111xinyidataList", dataList);
     const entries = dataAttributeToConfig(dataList);
-    console.log("111111xinyientries", entries);
     watchMutationsAndApplyFragments(
     type,
     document.body,
