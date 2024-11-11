@@ -152,73 +152,6 @@ function getAllMetadata(scope) {
   }, value ? { value } : {});
 }
 
-
-/**
- * Gets all the data attributes that are in the given scope.
- * @param {String} scope The scope/prefix for the metadata
- * @returns a map of key/value pairs for the given scope
- */
-// eslint-disable-next-line no-unused-vars
-async function getAllEntries(document, scope) {
-    // Check if the DOM is still loading and attach event listener if needed
-    if (document.readyState === 'loading') {
-      return new Promise((resolve) => {
-        document.addEventListener('DOMContentLoaded', () => {
-          resolve(getAllEntries(document, scope));
-        });
-      });
-    }
-  
-    const entries = [];
-    document.body.querySelectorAll(`[data-${scope}]`).forEach((element) => {
-      const experiment = element.getAttribute(`data-${scope}`);
-      const urls = element.getAttribute(`data-${scope}-variant`).split(',').map((url) => url.trim());
-      const length = urls.length;
-      const vnames = Array.from({ length }, (_, i) => `challenger-${i + 1}`);
-
-      let customLabels = (element.getAttribute(`data-${scope}-name`)||'').split(',').map((url) => url.trim());
-      const labels = Array.from({ length }, (_, i) => customLabels[i] || `Challenger ${i + 1}`);
-      const selector = Array.from(element.classList).map((cls) => `.${cls}`).join('');
-      const page = window.location.pathname;
-      
-      //split
-      const split = element.getAttribute(`data-${scope}-split`) 
-      ? element.getAttribute(`data-${scope}-split`).split(',').map((i) => parseFloat(i))
-      : Array.from({ length }, () => 1 / length); 
-
-      //status
-        const status = element.getAttribute(`data-${scope}-status`);
-
-      //date
-      const startDate = element.getAttribute(`data-${scope}-start-date`) ? new Date(element.getAttribute(`data-${scope}-start-date`)) : null;
-      const endDate = element.getAttribute(`data-${scope}-end-date`) ? new Date(element.getAttribute(`data-${scope}-end-date`)) : null;
-  
-      //audience
-      const audience = element.getAttribute(`data-${scope}-audience`).split(',').map((url) => url.trim());
-      const audienceAttributes = Array.from(element.attributes)
-      .filter(attr => attr.name.startsWith(`data-audience-`))
-      .map(attr => ({ audience: attr.name.replace('data-', ''), url: attr.value.trim()}));
-  
-      const entry = {
-        audienceAttributes,
-        audience,
-        startDate,
-        endDate,
-        status,
-        split,
-        experiment,
-        name: labels,
-        variant:vnames,
-        selector,
-        url: urls,
-        page
-      };
-      entries.push(entry);
-    });
-  
-    return entries;
-  }  
-
   /**
  * Gets all the data attributes that are in the given scope.
  * @param {String} scope The scope/prefix for the metadata
@@ -555,6 +488,7 @@ function watchMutationsAndApplyFragments(
         return;
       }
       const el = scope.querySelector(entry.selector);
+
       if (!el) {
         return;
       }
@@ -609,10 +543,13 @@ async function applyAllModifications(
   const configs = [];
 
   let dataList = await getAllDataAttributes(document, type);
+  console.log("xinyiyyyyydocument,tyle", document, type);
   // dataList = dataList.slice(1,2);
     // Fragment-level modifications
   if (dataList.length) {
+    console.log("111111xinyidataList", dataList);
     const entries = dataAttributeToConfig(dataList);
+    console.log("111111xinyientries", entries);
     watchMutationsAndApplyFragments(
     type,
     document.body,
@@ -804,7 +741,7 @@ function parseExperimentManifest(rawEntries) {
     //audience
     const audience = entry['audience'].split(',').map((url) => url.trim());
     
-    const experimentEntry = {
+    const entryC = {
       audience,
       startDate,
       endDate,
@@ -818,8 +755,9 @@ function parseExperimentManifest(rawEntries) {
       page
     };
 
-    entries.push(experimentEntry);
+    entries.push(entryC);
   }
+  console.log("entries", entries);
   return entries;  
 }
 
@@ -920,6 +858,8 @@ function parseCampaignManifest(rawEntries) {
     };
   });
 }
+
+
 
 function getUrlFromCampaignConfig(config) {
   return config.selectedCampaign
