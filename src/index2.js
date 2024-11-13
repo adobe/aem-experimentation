@@ -198,22 +198,30 @@ function getSelectorForElement(el) {
 }
 
 function getAllMetadataAttributes(document, scope) {
-  return [...document.querySelectorAll('*')]
-    .filter(el => Object.keys(el.dataset).some(key => key === scope || key.startsWith(scope)))
+  return [...document.querySelectorAll(`[data-${scope}]`)] 
     .map((el) => {
-      return Object.entries(el.dataset)
+      const obj = Object.entries(el.dataset)
         .filter(([key]) => key === scope || key.startsWith(scope))
-        .reduce((obj, [key, val]) => {
+        .reduce((acc, [key, val]) => {
           if (key === scope) {
-            obj['value'] = val;
+            acc['value'] = val;
           } else {
-            // remove scope prefix
+            // remove scope prefix and convert to camelCase
             const newKey = key.replace(scope, '');
-            obj[newKey.charAt(0).toLowerCase() + newKey.slice(1)] = val;
+            const camelKey = newKey.charAt(0).toLowerCase() + newKey.slice(1);
+            acc[camelKey] = val;
           }
-          obj.selector = getSelectorForElement(el);
-          return obj;
+          acc.selector = getSelectorForElement(el);
+          return acc;
         }, {});
+      
+      if (obj.variants || obj.variant) {
+        obj.variants = obj.variants.split(/,\s*\n\s*|\s*,\s*/)
+          .map(url => url.trim())
+          .filter(url => url.length > 0);
+      }
+      
+      return obj;
     });
 }
 
@@ -447,6 +455,7 @@ function createModificationsHandler(
 ) {
   return async (el, metadata) => {
     const config = await metadataToConfig(pluginOptions, metadata, overrides);
+    console.log("xinyi-config", config);
     if (!config) {
       return null;
     }
@@ -462,7 +471,7 @@ function createModificationsHandler(
         return;
       }
       // eslint-disable-next-line no-await-in-loop
-      res = await replaceInner(new URL(url, window.location.origin).pathname, el);
+      res = await replaceInner(new URL(url, window.location.origin).pathname, el, config?.selector);
     } else {
       res = url;
     }
@@ -592,7 +601,6 @@ async function applyAllModifications(
   pluginOptions,
   metadataToConfig,
   manifestToConfig,
-  aemManifestToConfig,
   getExperienceUrl,
   cb,
 ) {
@@ -636,22 +644,40 @@ async function applyAllModifications(
     }));
 
   // AEM data attributes (element/component)
-  let dataList = await getAllMetadataAttributes(document, type);
-  if (dataList.length) {
-    const entries = aemManifestToConfig(dataList);
-    watchMutationsAndApplyFragments(
-    type,
-    document.body,
-    entries,
-    configs,
-    getExperienceUrl,
-    pluginOptions,
-    metadataToConfig,
-    getAllQueryParameters(paramNS),
-    cb,
-    );
-  }
+  // let dataList = await getAllMetadataAttributes(document, type);
+  // if (dataList.length) {
+  //   const entries = aemManifestToConfig(dataList);
+  //   watchMutationsAndApplyFragments(
+  //   type,
+  //   document.body,
+  //   entries,
+  //   configs,
+  //   getExperienceUrl,
+  //   pluginOptions,
+  //   metadataToConfig,
+  //   getAllQueryParameters(paramNS),
+  //   cb,
+  //   );
+  // }
 
+ const aemDataList = getAllMetadataAttributes(document, type);
+  await Promise.all(aemDataList.map(async (aemMetadata) => {
+    const targetEl = document.querySelector(aemMetadata.selector);
+    if (!targetEl) return;
+
+    const componentNS = await modificationsHandler(
+      targetEl,
+      aemMetadata
+    );
+
+    if (componentNS) {
+      componentNS.type = 'component';
+      debug('component', type, componentNS);
+      configs.push(componentNS);
+    }
+  }));
+
+  // fragment modifications
   if (pageMetadata.manifest) {
     let entries = await getManifestEntriesForCurrentPage(pageMetadata.manifest);
     if (entries) {
@@ -765,6 +791,8 @@ async function getExperimentConfig(pluginOptions, metadata, overrides) {
     pluginOptions,
   );
 
+  const selector = metadata.selector;
+  
   const startDate = metadata.startDate ? new Date(metadata.startDate) : null;
   const endDate = metadata.endDate ? new Date(metadata.endDate) : null;
 
@@ -775,6 +803,7 @@ async function getExperimentConfig(pluginOptions, metadata, overrides) {
     audiences,
     endDate,
     resolvedAudiences,
+    selector,
     startDate,
     variants,
     variantNames,
@@ -825,54 +854,6 @@ function parseExperimentManifest(entries) {
   )).map(aggregateEntries('experiment', ['split', 'url', 'variant', 'name']));
 }
 
-function parseAemExperimentManifest(rawEntries) {
-  const entries = [];
-  for (const entry of rawEntries.slice(1)) {
-    const experiment = entry['value'];
-    const urls = entry['variant'].split(',').map((url) => url.trim());
-    const length = urls.length;
-    const vnames = Array.from({ length }, (_, i) => `challenger-${i + 1}`);
-
-    let customLabels = (entry['name']||'').split(',').map((url) => url.trim());
-    const labels = Array.from({ length }, (_, i) => customLabels[i] || `Challenger ${i + 1}`);
-    const selector = entry['selector'];
-    const page = window.location.pathname;
-    
-    //split
-    const split = entry['split'] 
-    ? entry['split'].split(',').map((i) => parseFloat(i))
-    : Array.from({ length }, () => 1 / length); 
-
-    //status
-    const status = entry['status'];
-
-    //date
-    const startDate = entry['start-date'] ? new Date(entry['start-date']) : null;
-    const endDate = entry['end-date'] ? new Date(entry['end-date']) : null;
-
-    //audience
-    const audience = entry['audience'].split(',').map((url) => url.trim());
-    
-    const entryC = {
-      audience,
-      startDate,
-      endDate,
-      status,
-      split,
-      experiment,
-      name: labels,
-      variant:vnames,
-      selector,
-      url: urls,
-      page
-    };
-
-    entries.push(entryC);
-  }
-  return entries;  
-
-}
-
 function getUrlFromExperimentConfig(config) {
   return config.run
     ? config.variants[config.selectedVariant].pages[0]
@@ -886,7 +867,6 @@ async function runExperiment(document, pluginOptions) {
     pluginOptions,
     getExperimentConfig,
     parseExperimentManifest,
-    parseAemExperimentManifest,
     getUrlFromExperimentConfig,
     (el, config, result) => {
       fireRUM('experiment', config, pluginOptions, result);
@@ -1137,7 +1117,7 @@ async function loadEager(document, options = {}) {
   }
 
   const ns = window.aem || window.hlx || {};
-  ns.audiences = await serveAudience(document, pluginOptions);
+ // ns.audiences = await serveAudience(document, pluginOptions);
   ns.experiments = await runExperiment(document, pluginOptions);
   ns.campaigns = await runCampaign(document, pluginOptions);
   return ns;
@@ -1158,3 +1138,4 @@ async function loadLazy(document, options = {}) {
   };
   preview.default.call(context, document, pluginOptions);
 }
+
