@@ -197,35 +197,43 @@ function getSelectorForElement(el) {
     .join(' ');
 }
 
+// convert the selector to a target selector to find component in variant page (custom function)
+function convertToVariantSelector(selector) {
+  const componentType = selector.match(/\.([\w-]+):/g)?.pop()?.replace(/[:.]/g, '') || '';
+  return `.cmp-${componentType}`;
+}
+
 function getAllMetadataAttributes(document, scope) {
-  return [...document.querySelectorAll(`[data-${scope}]`)] 
+  return [...document.querySelectorAll('*')]
+    .filter(el => Object.keys(el.dataset).some(key => key.startsWith(scope)))
     .map((el) => {
       const obj = Object.entries(el.dataset)
-        .filter(([key]) => key === scope || key.startsWith(scope))
         .reduce((acc, [key, val]) => {
           if (key === scope) {
             acc['value'] = val;
-          } else {
-            // remove scope prefix and convert to camelCase
+          } else if (key.startsWith(scope)) {
+            // Remove scope prefix and convert to camelCase
             const newKey = key.replace(scope, '');
             const camelKey = newKey.charAt(0).toLowerCase() + newKey.slice(1);
             acc[camelKey] = val;
           }
-          acc.selector = getSelectorForElement(el);
           return acc;
         }, {});
-      
+
+      obj.selector = getSelectorForElement(el);
+      obj.variantSelector = convertToVariantSelector(obj.selector);
+
+      // Process variants if present
       if (obj.variants || obj.variant) {
         obj.variants = obj.variants.split(/,\s*\n\s*|\s*,\s*/)
           .map(url => url.trim())
           .filter(url => url.length > 0);
       }
-      
+
       return obj;
     });
 }
-
-/**
+/*
  * Gets all the query parameters that are in the given scope.
  * @param {String} scope The scope/prefix for the metadata
  * @returns a map of key/value pairs for the given scope
@@ -287,34 +295,6 @@ function getAllSectionMeta(block, scope) {
 }
 
 /**
- * Finds the element in variant page based on the selector
- * @param {Document} dom 
- * @param {String} selector 
- * @returns {HTMLElement} the corresponding element
- */
-
-// Question :  1. how the variant content looks like? what the markup looks like? (is it only element?) 
-//             2. could be other type of component? e.g text to replace image
-function findVariantElement(dom, selector) {
-  // try exact selector first
-  let newEl = dom.querySelector(selector);
-  if (newEl) {
-    return newEl;
-  }
-
-  // extract component type from the selector
-  const componentType = selector.match(/\.([\w-]+):/g)?.pop()?.replace(/[:.]/g, '') || '';
-  
-  if (componentType) {
-    return dom.querySelector(`[data-cmp-is="${componentType}"]`) || 
-           dom.querySelector(`.cmp-${componentType}`) ||
-           dom.body.firstElementChild;
-  }
-
-  return dom.body.firstElementChild;
-}
-
-/**
  * Replaces element with content from path
  * @param {String} path
  * @param {HTMLElement} el
@@ -334,7 +314,7 @@ async function replaceInner(path, el, selector) {
     // eslint-disable-next-line no-param-reassign
     let newEl;
     if (selector) {
-      newEl = findVariantElement(dom, selector);
+      newEl = dom.querySelector(selector);
     }
     if (!newEl) {
       newEl = dom.querySelector(el.tagName === 'MAIN' ? 'main' : 'main > div');
@@ -453,9 +433,8 @@ function createModificationsHandler(
   pluginOptions,
   cb,
 ) {
-  return async (el, metadata) => {
+  return async (el, metadata, selector) => {
     const config = await metadataToConfig(pluginOptions, metadata, overrides);
-    console.log("xinyi-config", config);
     if (!config) {
       return null;
     }
@@ -471,7 +450,7 @@ function createModificationsHandler(
         return;
       }
       // eslint-disable-next-line no-await-in-loop
-      res = await replaceInner(new URL(url, window.location.origin).pathname, el, config?.selector);
+      res = await replaceInner(new URL(url, window.location.origin).pathname, el, selector);
     } else {
       res = url;
     }
@@ -643,31 +622,18 @@ async function applyAllModifications(
       }
     }));
 
-  // AEM data attributes (element/component)
-  // let dataList = await getAllMetadataAttributes(document, type);
-  // if (dataList.length) {
-  //   const entries = aemManifestToConfig(dataList);
-  //   watchMutationsAndApplyFragments(
-  //   type,
-  //   document.body,
-  //   entries,
-  //   configs,
-  //   getExperienceUrl,
-  //   pluginOptions,
-  //   metadataToConfig,
-  //   getAllQueryParameters(paramNS),
-  //   cb,
-  //   );
-  // }
+//AEM CS experimentation modifications
+ const componentDataList = getAllMetadataAttributes(document, type);
+  await Promise.all(componentDataList.map(async (componentMetadata) => {
+    const { selector, variantSelector, ...metadata } = componentMetadata;
+    const component = document.querySelector(selector);
 
- const aemDataList = getAllMetadataAttributes(document, type);
-  await Promise.all(aemDataList.map(async (aemMetadata) => {
-    const targetEl = document.querySelector(aemMetadata.selector);
-    if (!targetEl) return;
+    if (!component) return;
 
     const componentNS = await modificationsHandler(
-      targetEl,
-      aemMetadata
+      component,
+      metadata,
+      variantSelector,
     );
 
     if (componentNS) {
@@ -791,8 +757,6 @@ async function getExperimentConfig(pluginOptions, metadata, overrides) {
     pluginOptions,
   );
 
-  const selector = metadata.selector;
-  
   const startDate = metadata.startDate ? new Date(metadata.startDate) : null;
   const endDate = metadata.endDate ? new Date(metadata.endDate) : null;
 
@@ -803,7 +767,6 @@ async function getExperimentConfig(pluginOptions, metadata, overrides) {
     audiences,
     endDate,
     resolvedAudiences,
-    selector,
     startDate,
     variants,
     variantNames,
@@ -955,22 +918,6 @@ function parseCampaignManifest(entries) {
     });
 }
 
-function parseAemCampaignManifest(rawEntries) {
-  return rawEntries.map(entry => {
-    const { selector, audience = '', ...campaigns } = entry;
-    const audiences = audience.split(',').map(aud => aud.trim());
-    const page = window.location.pathname;
-
-    return {
-      audiences,
-      campaigns,
-      page,
-      selector
-    };
-  });
-}
-
-
 function getUrlFromCampaignConfig(config) {
   return config.selectedCampaign
     ? config.configuredCampaigns[config.selectedCampaign]
@@ -984,7 +931,6 @@ async function runCampaign(document, pluginOptions) {
     pluginOptions,
     getCampaignConfig,
     parseCampaignManifest,
-    parseAemCampaignManifest,
     getUrlFromCampaignConfig,
     (el, config, result) => {
       fireRUM('campaign', config, pluginOptions, result);
@@ -1052,19 +998,6 @@ function parseAudienceManifest(entries) {
     });
 }
 
-function parseAemAudienceManifest(rawEntries) {
-  return rawEntries.map(entry => {
-    const { selector, ...audiences } = entry;
-    const page = window.location.pathname;
-
-    return {
-      audiences,
-      page,
-      selector
-    };
-  });
-}
-
 function getUrlFromAudienceConfig(config) {
   return config.selectedAudience
     ? config.configuredAudiences[config.selectedAudience]
@@ -1079,7 +1012,6 @@ async function serveAudience(document, pluginOptions) {
     pluginOptions,
     getAudienceConfig,
     parseAudienceManifest,
-    parseAemAudienceManifest,
     getUrlFromAudienceConfig,
     (el, config, result) => {
       fireRUM('audience', config, pluginOptions, result);
@@ -1117,7 +1049,7 @@ async function loadEager(document, options = {}) {
   }
 
   const ns = window.aem || window.hlx || {};
- // ns.audiences = await serveAudience(document, pluginOptions);
+  ns.audiences = await serveAudience(document, pluginOptions);
   ns.experiments = await runExperiment(document, pluginOptions);
   ns.campaigns = await runCampaign(document, pluginOptions);
   return ns;
@@ -1138,4 +1070,3 @@ async function loadLazy(document, options = {}) {
   };
   preview.default.call(context, document, pluginOptions);
 }
-
