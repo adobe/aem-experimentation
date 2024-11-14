@@ -10,7 +10,6 @@
  * governing permissions and limitations under the License.
  */
 
-
 let isDebugEnabled;
 function setDebugMode(url, pluginOptions) {
   const { host, hostname, origin } = url;
@@ -73,6 +72,21 @@ function toClassName(name) {
 }
 
 /**
+ * Triggers the callback when the page is actually activated,
+ * This is to properly handle speculative page prerendering and marketing events.
+ * @param {Function} cb The callback to run
+ */
+async function onPageActivation(cb) {
+  // Speculative prerender-aware execution.
+  // See: https://developer.mozilla.org/en-US/docs/Web/API/Speculation_Rules_API#unsafe_prerendering
+  if (document.prerendering) {
+    document.addEventListener('prerenderingchange', cb, { once: true });
+  } else {
+    cb();
+  }
+}
+
+/**
  * Fires a Real User Monitoring (RUM) event based on the provided type and configuration.
  * @param {string} type - the type of event to be fired ("experiment", "campaign", or "audience")
  * @param {Object} config - contains details about the experience
@@ -99,7 +113,9 @@ function fireRUM(type, config, pluginOptions, result) {
 
   const { source, target } = typeHandlers[type]();
   const rumType = type === 'experiment' ? 'experiment' : 'audience';
-  window.hlx?.rum?.sampleRUM(rumType, { source, target });
+  onPageActivation(() => {
+    window.hlx?.rum?.sampleRUM(rumType, { source, target });
+  });
 }
 
 /**
@@ -127,7 +143,7 @@ function removeLeadingHyphens(inputString) {
  * @returns {String} The metadata value(s)
  */
 function getMetadata(name) {
-  const meta = [...document.body.querySelectorAll(`meta[name="${name}"]`)].map((m) => m.content).join(', ');
+  const meta = [...document.head.querySelectorAll(`meta[name="${name}"]`)].map((m) => m.content).join(', ');
   return meta || '';
 }
 
@@ -138,7 +154,7 @@ function getMetadata(name) {
  */
 function getAllMetadata(scope) {
   const value = getMetadata(scope);
-  const metaTags = document.body.querySelectorAll(`meta[name^="${scope}"], meta[property^="${scope}:"]`);
+  const metaTags = document.head.querySelectorAll(`meta[name^="${scope}"], meta[property^="${scope}:"]`);
   return [...metaTags].reduce((res, meta) => {
     const key = removeLeadingHyphens(
       meta.getAttribute('name')
@@ -152,45 +168,73 @@ function getAllMetadata(scope) {
   }, value ? { value } : {});
 }
 
-  /**
+/**
  * Gets all the data attributes that are in the given scope.
  * @param {String} scope The scope/prefix for the metadata
  * @returns a map of key/value pairs for the given scope
  */
 // eslint-disable-next-line no-unused-vars
-async function getAllDataAttributes(document, scope) {
-  if (document.readyState === 'loading') {
-    return new Promise((resolve) => {
-      document.addEventListener('DOMContentLoaded', () => {
-        resolve(getAllDataAttributes(document, scope));
-      });
-    });
+function getAllDataAttributes(el, scope) {
+  return el.getAttributeNames()
+    .filter((attr) => attr === `data-${scope}` || attr.startsWith(`data-${scope}-`))
+    .reduce((res, attr) => {
+      const key = attr === `data-${scope}` ? 'value' : attr.replace(`data-${scope}-`, '');
+      res[key] = el.getAttribute(attr);
+      return res;
+    }, {});
+}
+
+function getSelectorForElement(el) {
+  const parents = [];
+  let p = el;
+  while (p && p.tagName !== 'HTML') {
+    parents.unshift(p);
+    p = p.parentNode;
   }
+  return parents
+    .map((p) => (p.id && `#${p.id}`)
+      || (p.className && `.${p.classList[0]}:nth-child(${[...p.parentNode.children].indexOf(p) + 1})`))
+    .join(' ');
+}
 
-  const results = [];
-  const components = Array.from(document.querySelectorAll('*')).filter(element =>
-    Array.from(element.attributes).some(attr => attr.name.startsWith(`data-${scope}-`))
-  );
+// convert the selector to a target selector to find component in variant page (custom function)
+// Challenge:  experience fragment where CSS class may be different for each variation
+function convertToVariantSelector(selector) {
+  const componentType = selector.match(/\.([\w-]+):/g)?.pop()?.replace(/[:.]/g, '') || '';
+  return `.cmp-${componentType}`;
+}
 
-  components.forEach(component => {
-    const obj = {};
+function getAllMetadataAttributes(document, scope) {
+  return [...document.querySelectorAll('*')]
+    .filter(el => Object.keys(el.dataset).some(key => key.startsWith(scope)))
+    .map((el) => {
+      const obj = Object.entries(el.dataset)
+        .reduce((acc, [key, val]) => {
+          if (key === scope) {
+            acc['value'] = val;
+          } else if (key.startsWith(scope)) {
+            // remove scope prefix
+            const unprefixedKey = key.replace(scope, '');
+            const camelCaseKey = toCamelCase(unprefixedKey);
+            acc[camelCaseKey] = val;
+          }
+          return acc;
+        }, {});
 
-    Array.from(component.attributes).forEach(attribute => {
-      if (attribute.name.startsWith(`data-${scope}-`)) {
-        obj[attribute.name.replace(`data-${scope}-`, '')] = attribute.value;
-      } else if (attribute.name === `data-${scope}`) {
-        obj['value'] = attribute.value;
+      obj.selector = getSelectorForElement(el);
+      obj.variantSelector = convertToVariantSelector(obj.selector);
+
+      // process variants into array
+      if (obj.variants || obj.variant) {
+        obj.variants = obj.variants.split(/,\s*\n\s*|\s*,\s*/)
+          .map(url => url.trim())
+          .filter(url => url.length > 0);
       }
+
+      return obj;
     });
-    
-    obj['selector'] = Array.from(component.classList).map(cls => `.${cls}`).join('');
-
-    results.push(obj);
-  });
-  return results;
-}  
-
-/**
+}
+/*
  * Gets all the query parameters that are in the given scope.
  * @param {String} scope The scope/prefix for the metadata
  * @returns a map of key/value pairs for the given scope
@@ -262,6 +306,7 @@ async function replaceInner(path, el, selector) {
     const resp = await fetch(path);
     if (!resp.ok) {
       // eslint-disable-next-line no-console
+      console.log('error loading content:', resp);
       return null;
     }
     const html = await resp.text();
@@ -389,7 +434,7 @@ function createModificationsHandler(
   pluginOptions,
   cb,
 ) {
-  return async (el, metadata) => {
+  return async (el, metadata, selector) => {
     const config = await metadataToConfig(pluginOptions, metadata, overrides);
     if (!config) {
       return null;
@@ -406,11 +451,11 @@ function createModificationsHandler(
         return;
       }
       // eslint-disable-next-line no-await-in-loop
-      res = await replaceInner(new URL(url, window.location.origin).pathname, el);
+      res = await replaceInner(new URL(url, window.location.origin).pathname, el, selector);
     } else {
       res = url;
     }
-   // cb(el.tagName === 'MAIN' ? document.body : ns.el, ns.config, res ? url : null);
+    cb(el.tagName === 'MAIN' ? document.body : ns.el, ns.config, res ? url : null);
     if (res) {
       ns.servedExperience = url;
     }
@@ -481,6 +526,7 @@ function watchMutationsAndApplyFragments(
   }
 
   new MutationObserver(async (_, observer) => {
+    // eslint-disable-next-line no-restricted-syntax
     for (const entry of entries) {
       // eslint-disable-next-line no-await-in-loop
       const config = await metadataToConfig(pluginOptions, entry, overrides);
@@ -488,7 +534,6 @@ function watchMutationsAndApplyFragments(
         return;
       }
       const el = scope.querySelector(entry.selector);
-
       if (!el) {
         return;
       }
@@ -535,28 +580,88 @@ async function applyAllModifications(
   paramNS,
   pluginOptions,
   metadataToConfig,
-  dataAttributeToConfig,
+  manifestToConfig,
   getExperienceUrl,
   cb,
 ) {
+  const modificationsHandler = createModificationsHandler(
+    type,
+    getAllQueryParameters(paramNS),
+    metadataToConfig,
+    getExperienceUrl,
+    pluginOptions,
+    cb,
+  );
 
   const configs = [];
 
-  let dataList = await getAllDataAttributes(document, type);
-    // Fragment-level modifications
-  if (dataList.length) {
-    const entries = dataAttributeToConfig(dataList);
-    watchMutationsAndApplyFragments(
-    type,
-    document.body,
-    entries,
-    configs,
-    getExperienceUrl,
-    pluginOptions,
-    metadataToConfig,
-    getAllQueryParameters(paramNS),
-    cb,
-    );
+  // Full-page modifications
+  const pageMetadata = getAllMetadata(type);
+  const pageNS = await modificationsHandler(
+    document.querySelector('main'),
+    pageMetadata,
+  );
+
+  if (pageNS) {
+    pageNS.type = 'page';
+    configs.push(pageNS);
+    debug('page', type, pageNS);
+  }
+
+  // Section-level modifications
+  let sectionMetadata;
+  await Promise.all([...document.querySelectorAll('.section-metadata')]
+    .map(async (sm) => {
+      sectionMetadata = getAllSectionMeta(sm, type);
+      const sectionNS = await modificationsHandler(
+        sm.parentElement,
+        sectionMetadata,
+      );
+      if (sectionNS) {
+        sectionNS.type = 'section';
+        debug('section', type, sectionNS);
+        configs.push(sectionNS);
+      }
+    }));
+
+  //AEM CS experimentation modifications
+  const componentDataList = getAllMetadataAttributes(document, type);
+    await Promise.all(componentDataList.map(async (componentMetadata) => {
+      const { selector, variantSelector, ...metadata } = componentMetadata;
+      const component = document.querySelector(selector);
+
+      if (!component) return;
+
+      const componentNS = await modificationsHandler(
+        component,
+        metadata,
+        variantSelector,
+      );
+
+      if (componentNS) {
+        componentNS.type = 'component';
+        debug('component', type, componentNS);
+        configs.push(componentNS);
+      }
+    }));
+
+  // fragment modifications
+  if (pageMetadata.manifest) {
+    let entries = await getManifestEntriesForCurrentPage(pageMetadata.manifest);
+    if (entries) {
+      entries = manifestToConfig(entries);
+      watchMutationsAndApplyFragments(
+        type,
+        document.body,
+        entries,
+        configs,
+        getExperienceUrl,
+        pluginOptions,
+        metadataToConfig,
+        getAllQueryParameters(paramNS),
+        cb,
+      );
+    }
   }
 
   return configs;
@@ -580,19 +685,14 @@ function aggregateEntries(type, allowedMultiValuesProperties) {
   }, {});
 }
 
-let experimentCounter = 0;
 /**
  * Parses the experiment configuration from the metadata
  */
 async function getExperimentConfig(pluginOptions, metadata, overrides) {
-  // Generate a unique ID for each experiment instance
-  const baseId = toClassName(metadata.value || metadata.experiment);
-  if (!baseId) {
+  const id = toClassName(metadata.value || metadata.experiment);
+  if (!id) {
     return null;
   }
-  
-  // Append a unique suffix to the base ID
-  const id = `${baseId}-${experimentCounter++}`; 
 
   let pages = metadata.variants || metadata.url;
 
@@ -619,7 +719,6 @@ async function getExperimentConfig(pluginOptions, metadata, overrides) {
     ? stringToArray(metadata.split).map((i) => parseFloat(i) / 100)
     // even split
     : [...new Array(pages.length)].map(() => 1 / (pages.length + 1));
-
 
   const variantNames = [];
   variantNames.push('control');
@@ -697,10 +796,9 @@ async function getExperimentConfig(pluginOptions, metadata, overrides) {
     config.selectedVariant = toClassName(overrides.variant);
   } else {
     // eslint-disable-next-line import/extensions
-    //const { ued } = await import('http://localhost:4502/apps/wknd/clientlibs/clientlib-experimentation/js/ued.js');
-    //const decision = ued.evaluateDecisionPolicy(toDecisionPolicy(config), {});
-    //config.selectedVariant = decision.items[0].id;
-      config.selectedVariant = "control";
+    const { ued } = await import('./ued.js');
+    const decision = ued.evaluateDecisionPolicy(toDecisionPolicy(config), {});
+    config.selectedVariant = decision.items[0].id;
   }
 
   return config;
@@ -709,52 +807,11 @@ async function getExperimentConfig(pluginOptions, metadata, overrides) {
 /**
  * Parses the campaign manifest.
  */
-function parseExperimentManifest(rawEntries) {
-  const entries = [];
-  for (const entry of rawEntries) {
-    const experiment = entry['value'];
-    const urls = entry['variant'].split(',').map((url) => url.trim());
-    const length = urls.length;
-    const vnames = Array.from({ length }, (_, i) => `challenger-${i + 1}`);
-
-    let customLabels = (entry['name']||'').split(',').map((url) => url.trim());
-    const labels = Array.from({ length }, (_, i) => customLabels[i] || `Challenger ${i + 1}`);
-    const selector = entry['selector'];
-    const page = window.location.pathname;
-    
-    //split
-    const split = entry['split'] 
-    ? entry['split'].split(',').map((i) => parseFloat(i))
-    : Array.from({ length }, () => 1 / length); 
-
-    //status
-    const status = entry['status'];
-
-    //date
-    const startDate = entry['start-date'] ? new Date(entry['start-date']) : null;
-    const endDate = entry['end-date'] ? new Date(entry['end-date']) : null;
-
-    //audience
-    const audience = entry['audience'].split(',').map((url) => url.trim());
-    
-    const entryC = {
-      audience,
-      startDate,
-      endDate,
-      status,
-      split,
-      experiment,
-      name: labels,
-      variant:vnames,
-      selector,
-      url: urls,
-      page
-    };
-
-    entries.push(entryC);
-  }
-  console.log("entries", entries);
-  return entries;  
+function parseExperimentManifest(entries) {
+  return Object.values(Object.groupBy(
+    entries.map((e) => depluralizeProps(e, ['experiment', 'variant', 'split', 'name'])),
+    ({ experiment }) => experiment,
+  )).map(aggregateEntries('experiment', ['split', 'url', 'variant', 'name']));
 }
 
 function getUrlFromExperimentConfig(config) {
@@ -840,22 +897,23 @@ async function getCampaignConfig(pluginOptions, metadata, overrides) {
 /**
  * Parses the campaign manifest.
  */
-function parseCampaignManifest(rawEntries) {
-  return rawEntries.map(entry => {
-    const { selector, audience = '', ...campaigns } = entry;
-    const audiences = audience.split(',').map(aud => aud.trim());
-    const page = window.location.pathname;
-
-    return {
-      audiences,
-      campaigns,
-      page,
-      selector
-    };
-  });
+function parseCampaignManifest(entries) {
+  return Object.values(Object.groupBy(
+    entries.map((e) => depluralizeProps(e, ['campaign'])),
+    ({ selector }) => selector,
+  ))
+    .map(aggregateEntries('campaign', ['campaign', 'url']))
+    .map((e) => {
+      const campaigns = e.campaign;
+      delete e.campaign;
+      e.campaigns = {};
+      campaigns.forEach((a, i) => {
+        e.campaigns[toClassName(a)] = e.url[i];
+      });
+      delete e.url;
+      return e;
+    });
 }
-
-
 
 function getUrlFromCampaignConfig(config) {
   return config.selectedCampaign
@@ -872,7 +930,7 @@ async function runCampaign(document, pluginOptions) {
     parseCampaignManifest,
     getUrlFromCampaignConfig,
     (el, config, result) => {
-      //fireRUM('campaign', config, pluginOptions, result);
+      fireRUM('campaign', config, pluginOptions, result);
       // dispatch event
       const { selectedCampaign = 'default' } = config;
       const campaign = result ? toClassName(selectedCampaign) : 'default';
@@ -919,17 +977,22 @@ async function getAudienceConfig(pluginOptions, metadata, overrides) {
 /**
  * Parses the audience manifest.
  */
-function parseAudienceManifest(rawEntries) {
-  return rawEntries.map(entry => {
-    const { selector, ...audiences } = entry;
-    const page = window.location.pathname;
-
-    return {
-      audiences,
-      page,
-      selector
-    };
-  });
+function parseAudienceManifest(entries) {
+  return Object.values(Object.groupBy(
+    entries.map((e) => depluralizeProps(e, ['audience'])),
+    ({ selector }) => selector,
+  ))
+    .map(aggregateEntries('audience', ['audience', 'url']))
+    .map((e) => {
+      const audiences = e.audience;
+      delete e.audience;
+      e.audiences = {};
+      audiences.forEach((a, i) => {
+        e.audiences[toClassName(a)] = e.url[i];
+      });
+      delete e.url;
+      return e;
+    });
 }
 
 function getUrlFromAudienceConfig(config) {
@@ -939,7 +1002,7 @@ function getUrlFromAudienceConfig(config) {
 }
 
 async function serveAudience(document, pluginOptions) {
-  //document.body.dataset.audiences = Object.keys(pluginOptions.audiences).join(',');
+  document.body.dataset.audiences = Object.keys(pluginOptions.audiences).join(',');
   return applyAllModifications(
     pluginOptions.audiencesMetaTagPrefix,
     pluginOptions.audiencesQueryParameter,
@@ -948,7 +1011,7 @@ async function serveAudience(document, pluginOptions) {
     parseAudienceManifest,
     getUrlFromAudienceConfig,
     (el, config, result) => {
-      //fireRUM('audience', config, pluginOptions, result);
+      fireRUM('audience', config, pluginOptions, result);
       // dispatch event
       const { selectedAudience = 'default' } = config;
       const audience = result ? toClassName(selectedAudience) : 'default';
@@ -969,14 +1032,21 @@ async function loadEager(document, options = {}) {
   const pluginOptions = { ...DEFAULT_OPTIONS, ...options };
   setDebugMode(window.location, pluginOptions);
 
+  // wait for DOM to be ready
+  if (document.readyState === 'loading') {
+    await new Promise(resolve => document.addEventListener('DOMContentLoaded', resolve));
+  }
+
   const ns = window.aem || window.hlx || {};
   ns.audiences = await serveAudience(document, pluginOptions);
   ns.experiments = await runExperiment(document, pluginOptions);
   ns.campaigns = await runCampaign(document, pluginOptions);
+  return ns;
 }
 
 async function loadLazy(document, options = {}) {
-  const pluginOptions = { ...DEFAULT_OPTIONS, ...options} ;
+  const pluginOptions = { ...DEFAULT_OPTIONS, ...options };
+  // do not show the experimentation pill on prod domains
   if (!isDebugEnabled) {
     return;
   }
