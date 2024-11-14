@@ -186,14 +186,14 @@ function getAllDataAttributes(el, scope) {
 
 function getSelectorForElement(el) {
   const parents = [];
-  let p = el;
-  while (p && p.tagName !== 'HTML') {
-    parents.unshift(p);
-    p = p.parentNode;
+  let currentElement = el;
+  while (currentElement && currentElement.tagName !== 'HTML') {
+    parents.unshift(currentElement);
+    currentElement = currentElement.parentNode;
   }
   return parents
-    .map((p) => (p.id && `#${p.id}`)
-      || (p.className && `.${p.classList[0]}:nth-child(${[...p.parentNode.children].indexOf(p) + 1})`))
+    .map((element) => (element.id && `#${element.id}`)
+      || (element.className && `.${element.classList[0]}:nth-child(${[...element.parentNode.children].indexOf(element) + 1})`))
     .join(' ');
 }
 
@@ -206,12 +206,12 @@ function convertToVariantSelector(selector) {
 
 function getAllMetadataAttributes(document, scope) {
   return [...document.querySelectorAll('*')]
-    .filter(el => Object.keys(el.dataset).some(key => key.startsWith(scope)))
+    .filter((el) => Object.keys(el.dataset).some((key) => key.startsWith(scope)))
     .map((el) => {
       const obj = Object.entries(el.dataset)
         .reduce((acc, [key, val]) => {
           if (key === scope) {
-            acc['value'] = val;
+            acc.value = val;
           } else if (key.startsWith(scope)) {
             // remove scope prefix
             const unprefixedKey = key.replace(scope, '');
@@ -227,13 +227,14 @@ function getAllMetadataAttributes(document, scope) {
       // process variants into array
       if (obj.variants || obj.variant) {
         obj.variants = obj.variants.split(/,\s*\n\s*|\s*,\s*/)
-          .map(url => url.trim())
-          .filter(url => url.length > 0);
+          .map((url) => url.trim())
+          .filter((url) => url.length > 0);
       }
 
       return obj;
     });
 }
+
 /*
  * Gets all the query parameters that are in the given scope.
  * @param {String} scope The scope/prefix for the metadata
@@ -624,26 +625,26 @@ async function applyAllModifications(
       }
     }));
 
-  //AEM CS experimentation modifications
+  // AEM CS experimentation modifications
   const componentDataList = getAllMetadataAttributes(document, type);
-    await Promise.all(componentDataList.map(async (componentMetadata) => {
-      const { selector, variantSelector, ...metadata } = componentMetadata;
-      const component = document.querySelector(selector);
+  await Promise.all(componentDataList.map(async (componentMetadata) => {
+    const { selector, variantSelector, ...metadata } = componentMetadata;
+    const component = document.querySelector(selector);
 
-      if (!component) return;
+    if (!component) return;
 
-      const componentNS = await modificationsHandler(
-        component,
-        metadata,
-        variantSelector,
-      );
+    const componentNS = await modificationsHandler(
+      component,
+      metadata,
+      variantSelector,
+    );
 
-      if (componentNS) {
-        componentNS.type = 'component';
-        debug('component', type, componentNS);
-        configs.push(componentNS);
-      }
-    }));
+    if (componentNS) {
+      componentNS.type = 'component';
+      debug('component', type, componentNS);
+      configs.push(componentNS);
+    }
+  }));
 
   // fragment modifications
   if (pageMetadata.manifest) {
@@ -1034,7 +1035,7 @@ async function loadEager(document, options = {}) {
 
   // wait for DOM to be ready
   if (document.readyState === 'loading') {
-    await new Promise(resolve => document.addEventListener('DOMContentLoaded', resolve));
+    await new Promise((resolve) => document.addEventListener('DOMContentLoaded', resolve));
   }
 
   const ns = window.aem || window.hlx || {};
