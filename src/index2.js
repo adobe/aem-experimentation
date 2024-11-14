@@ -186,14 +186,14 @@ function getAllDataAttributes(el, scope) {
 
 function getSelectorForElement(el) {
   const parents = [];
-  let p = el;
-  while (p && p.tagName !== 'HTML') {
-    parents.unshift(p);
-    p = p.parentNode;
+  let currentElement = el;
+  while (currentElement && currentElement.tagName !== 'HTML') {
+    parents.unshift(currentElement);
+    currentElement = currentElement.parentNode;
   }
   return parents
-    .map((p) => (p.id && `#${p.id}`)
-      || (p.className && `.${p.classList[0]}:nth-child(${[...p.parentNode.children].indexOf(p) + 1})`))
+    .map((element) => (element.id && `#${element.id}`)
+      || (element.className && `.${element.classList[0]}:nth-child(${[...element.parentNode.children].indexOf(element) + 1})`))
     .join(' ');
 }
 
