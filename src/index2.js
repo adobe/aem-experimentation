@@ -198,6 +198,7 @@ function getSelectorForElement(el) {
 }
 
 // convert the selector to a target selector to find component in variant page (custom function)
+// Challenge:  experience fragment where CSS class may be different for each variation
 function convertToVariantSelector(selector) {
   const componentType = selector.match(/\.([\w-]+):/g)?.pop()?.replace(/[:.]/g, '') || '';
   return `.cmp-${componentType}`;
@@ -213,9 +214,9 @@ function getAllMetadataAttributes(document, scope) {
             acc['value'] = val;
           } else if (key.startsWith(scope)) {
             // Remove scope prefix and convert to camelCase
-            const newKey = key.replace(scope, '');
-            const camelKey = newKey.charAt(0).toLowerCase() + newKey.slice(1);
-            acc[camelKey] = val;
+            const unprefixedKey = key.replace(scope, '');
+            const camelCaseKey = toCamelCase(unprefixedKey);
+            acc[camelCaseKey] = val;
           }
           return acc;
         }, {});
@@ -600,6 +601,7 @@ async function applyAllModifications(
     document.querySelector('main'),
     pageMetadata,
   );
+
   if (pageNS) {
     pageNS.type = 'page';
     configs.push(pageNS);
@@ -1035,17 +1037,9 @@ async function loadEager(document, options = {}) {
   const pluginOptions = { ...DEFAULT_OPTIONS, ...options };
   setDebugMode(window.location, pluginOptions);
 
-  //  move DOM ready state check into caller
+  // wait for DOM to be ready
   if (document.readyState === 'loading') {
-    return new Promise((resolve) => {
-      document.addEventListener('DOMContentLoaded', async () => {
-        const ns = window.aem || window.hlx || {};
-        ns.audiences = await serveAudience(document, pluginOptions);
-        ns.experiments = await runExperiment(document, pluginOptions);
-        ns.campaigns = await runCampaign(document, pluginOptions);
-        resolve(ns);
-      });
-    });
+    await new Promise(resolve => document.addEventListener('DOMContentLoaded', resolve));
   }
 
   const ns = window.aem || window.hlx || {};
