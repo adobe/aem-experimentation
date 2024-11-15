@@ -11,7 +11,7 @@
  */
 
 let isDebugEnabled;
-function setDebugMode(url, pluginOptions) {
+export function setDebugMode(url, pluginOptions) {
   const { host, hostname, origin } = url;
   const { isProd, prodHost } = pluginOptions;
   isDebugEnabled = (url.hostname === 'localhost'
@@ -22,14 +22,14 @@ function setDebugMode(url, pluginOptions) {
   return isDebugEnabled;
 }
 
-function debug(...args) {
+export function debug(...args) {
   if (isDebugEnabled) {
     // eslint-disable-next-line no-console
     console.debug.call(this, '[aem-experimentation]', ...args);
   }
 }
 
-const DEFAULT_OPTIONS = {
+export const DEFAULT_OPTIONS = {
 
   // Audiences related properties
   audiences: {},
@@ -53,7 +53,7 @@ const DEFAULT_OPTIONS = {
  * @param {String|String[]} str The string to convert
  * @returns an array representing the converted string
  */
-function stringToArray(str) {
+export function stringToArray(str) {
   if (Array.isArray(str)) {
     return str;
   }
@@ -65,7 +65,7 @@ function stringToArray(str) {
  * @param {String} name The unsanitized name
  * @returns {String} The class name
  */
-function toClassName(name) {
+export function toClassName(name) {
   return typeof name === 'string'
     ? name.toLowerCase().replace(/[^0-9a-z]/gi, '-').replace(/-+/g, '-').replace(/^-|-$/g, '')
     : '';
@@ -123,7 +123,7 @@ function fireRUM(type, config, pluginOptions, result) {
  * @param {String} name The unsanitized name
  * @returns {String} The camelCased name
  */
-function toCamelCase(name) {
+export function toCamelCase(name) {
   return toClassName(name).replace(/-([a-z])/g, (g) => g[1].toUpperCase());
 }
 
@@ -132,7 +132,7 @@ function toCamelCase(name) {
  * @param {String} after the string to remove the leading hyphens from, usually is colon
  * @returns {String} The string without leading hyphens
  */
-function removeLeadingHyphens(inputString) {
+export function removeLeadingHyphens(inputString) {
   // Remove all leading hyphens which are converted from the space in metadata
   return inputString.replace(/^(-+)/, '');
 }
@@ -142,7 +142,7 @@ function removeLeadingHyphens(inputString) {
  * @param {String} name The metadata name (or property)
  * @returns {String} The metadata value(s)
  */
-function getMetadata(name) {
+export function getMetadata(name) {
   const meta = [...document.head.querySelectorAll(`meta[name="${name}"]`)].map((m) => m.content).join(', ');
   return meta || '';
 }
@@ -152,7 +152,7 @@ function getMetadata(name) {
  * @param {String} scope The scope/prefix for the metadata
  * @returns a map of key/value pairs for the given scope
  */
-function getAllMetadata(scope) {
+export function getAllMetadata(scope) {
   const value = getMetadata(scope);
   const metaTags = document.head.querySelectorAll(`meta[name^="${scope}"], meta[property^="${scope}:"]`);
   return [...metaTags].reduce((res, meta) => {
@@ -197,13 +197,6 @@ function getSelectorForElement(el) {
     .join(' ');
 }
 
-// convert the selector to a target selector to find component in variant page (custom function)
-// Challenge:  experience fragment where CSS class may be different for each variation
-function convertToVariantSelector(selector) {
-  const componentType = selector.match(/\.([\w-]+):/g)?.pop()?.replace(/[:.]/g, '') || '';
-  return `.cmp-${componentType}`;
-}
-
 function getAllMetadataAttributes(document, scope) {
   return [...document.querySelectorAll('*')]
     .filter((el) => Object.keys(el.dataset).some((key) => key.startsWith(scope)))
@@ -222,7 +215,6 @@ function getAllMetadataAttributes(document, scope) {
         }, {});
 
       obj.selector = getSelectorForElement(el);
-      obj.variantSelector = convertToVariantSelector(obj.selector);
 
       // process variants into array
       if (obj.variants || obj.variant) {
@@ -319,7 +311,11 @@ async function replaceInner(path, el, selector) {
       newEl = dom.querySelector(selector);
     }
     if (!newEl) {
-      newEl = dom.querySelector(el.tagName === 'MAIN' ? 'main' : 'main > div');
+      if (el.tagName === 'MAIN') {
+        newEl = dom.querySelector('main');
+      } else {
+        newEl = dom.querySelector('main > div') || dom.querySelector('body > div');
+      }
     }
     el.innerHTML = newEl.innerHTML;
     return path;
@@ -336,7 +332,7 @@ async function replaceInner(path, el, selector) {
  * @param {Object} options the plugin options
  * @returns Returns the names of the resolved audiences, or `null` if no audience is configured
  */
-async function getResolvedAudiences(pageAudiences, options) {
+export async function getResolvedAudiences(pageAudiences, options) {
   if (!pageAudiences.length || !Object.keys(options.audiences).length) {
     return null;
   }
@@ -435,7 +431,7 @@ function createModificationsHandler(
   pluginOptions,
   cb,
 ) {
-  return async (el, metadata, selector) => {
+  return async (el, metadata) => {
     const config = await metadataToConfig(pluginOptions, metadata, overrides);
     if (!config) {
       return null;
@@ -452,7 +448,7 @@ function createModificationsHandler(
         return;
       }
       // eslint-disable-next-line no-await-in-loop
-      res = await replaceInner(new URL(url, window.location.origin).pathname, el, selector);
+      res = await replaceInner(new URL(url, window.location.origin).pathname, el);
     } else {
       res = url;
     }
@@ -628,7 +624,7 @@ async function applyAllModifications(
   // AEM CS experimentation modifications
   const componentDataList = getAllMetadataAttributes(document, type);
   await Promise.all(componentDataList.map(async (componentMetadata) => {
-    const { selector, variantSelector, ...metadata } = componentMetadata;
+    const { selector, ...metadata } = componentMetadata;
     const component = document.querySelector(selector);
 
     if (!component) return;
@@ -636,7 +632,6 @@ async function applyAllModifications(
     const componentNS = await modificationsHandler(
       component,
       metadata,
-      variantSelector,
     );
 
     if (componentNS) {
@@ -1029,13 +1024,15 @@ async function serveAudience(document, pluginOptions) {
   );
 }
 
-async function loadEager(document, options = {}) {
+export async function loadEager(document, options = {}) {
   const pluginOptions = { ...DEFAULT_OPTIONS, ...options };
   setDebugMode(window.location, pluginOptions);
 
   // wait for DOM to be ready
   if (document.readyState === 'loading') {
-    await new Promise((resolve) => document.addEventListener('DOMContentLoaded', resolve));
+    await new Promise((resolve) => {
+      document.addEventListener('DOMContentLoaded', resolve);
+    });
   }
 
   const ns = window.aem || window.hlx || {};
@@ -1045,7 +1042,7 @@ async function loadEager(document, options = {}) {
   return ns;
 }
 
-async function loadLazy(document, options = {}) {
+export async function loadLazy(document, options = {}) {
   const pluginOptions = { ...DEFAULT_OPTIONS, ...options };
   // do not show the experimentation pill on prod domains
   if (!isDebugEnabled) {
