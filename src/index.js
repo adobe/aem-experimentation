@@ -200,30 +200,32 @@ function getSelectorForElement(el) {
 function getAllMetadataAttributes(document, scope) {
   return [...document.querySelectorAll('*')]
     .filter((el) => Object.keys(el.dataset).some((key) => key.startsWith(scope)))
-    .map((el) => {
-      const obj = Object.entries(el.dataset)
+    .flatMap((el) => {
+      const attributes = Object.entries(el.dataset)
         .reduce((acc, [key, val]) => {
           if (key === scope) {
             acc.value = val;
           } else if (key.startsWith(scope)) {
-            // remove scope prefix
-            const unprefixedKey = key.replace(scope, '');
+            const unprefixedKey = key.slice(scope.length);
             const camelCaseKey = toCamelCase(unprefixedKey);
             acc[camelCaseKey] = val;
           }
           return acc;
         }, {});
 
-      obj.selector = getSelectorForElement(el);
+      const selector = getSelectorForElement(el);
+      if (!selector) return [];
 
-      // process variants into array
-      if (obj.variants || obj.variant) {
-        obj.variants = obj.variants.split(/,\s*\n\s*|\s*,\s*/)
+      attributes.selector = selector;
+
+      if (attributes.variants || attributes.variant) {
+        attributes.variants = (attributes.variants || attributes.variant)
+          .split(/,\s*\n\s*|\s*,\s*/)
           .map((url) => url.trim())
           .filter((url) => url.length > 0);
       }
 
-      return obj;
+      return [attributes];
     });
 }
 
