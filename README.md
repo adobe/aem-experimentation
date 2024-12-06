@@ -169,7 +169,7 @@ runEager.call(document, {
   rumSamplingRate: 10,
 
   // these metadata fields will be updated when replacing content
-  overrideMetaFields: ['template', 'theme'],
+  overrideMetadataFields: [],
 
   // the storage type used to persist data between page views
   // (for instance to remember what variant in an experiment the user was served)

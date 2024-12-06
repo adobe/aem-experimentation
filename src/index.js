@@ -14,7 +14,7 @@ const MAX_SAMPLING_RATE = 10; // At a maximum we sample 1 in 10 requests
 export const DEFAULT_OPTIONS = {
   // Generic properties
   rumSamplingRate: MAX_SAMPLING_RATE, // 1 in 10 requests
-  overrideMetaFields: [],
+  overrideMetadataFields: [],
 
   // Audiences related properties
   audiences: {},
@@ -92,10 +92,10 @@ export async function getResolvedAudiences(applicableAudiences, options, context
  * Replaces main content from path
  * @param {string} path
  * @param {Document} doc
- * @param {string[]} overrideMetaFields
+ * @param {string[]} overrideMetadataFields
  * @return Returns the path that was loaded or null if the loading failed
  */
-async function replaceContent(path, doc, overrideMetaFields) {
+async function replaceContent(path, doc, overrideMetadataFields) {
   try {
     const resp = await fetch(path);
     if (!resp.ok) {
@@ -111,7 +111,7 @@ async function replaceContent(path, doc, overrideMetaFields) {
     doc.querySelector('main').innerHTML = dom.querySelector('main').innerHTML;
 
     // replace metadata fields
-    overrideMetaFields.forEach((metadataPropName) => {
+    overrideMetadataFields.forEach((metadataPropName) => {
       const attr = metadataPropName && metadataPropName.includes(':') ? 'property' : 'name';
       const newMetas = dom.head.querySelectorAll(`meta[${attr}="${metadataPropName}"]`);
       const oldMetas = doc.head.querySelectorAll(`meta[${attr}="${metadataPropName}"]`);
@@ -493,7 +493,7 @@ export async function runExperiment(document, options, context) {
   document.body.classList.add(`experiment-${context.toClassName(experimentConfig.id)}`);
   let result;
   if (pages[index] !== currentPath) {
-    result = await replaceContent(pages[index], document, pluginOptions.overrideMetaFields);
+    result = await replaceContent(pages[index], document, pluginOptions.overrideMetadataFields);
   } else {
     result = currentPath;
   }
@@ -554,7 +554,11 @@ export async function runCampaign(document, options, context) {
 
   try {
     const url = new URL(urlString);
-    const result = await replaceContent(url.pathname, document, pluginOptions.overrideMetaFields);
+    const result = await replaceContent(
+      url.pathname,
+      document,
+      pluginOptions.overrideMetadataFields,
+    );
     window.hlx.campaign.servedExperience = result || window.location.pathname;
     if (!result) {
       // eslint-disable-next-line no-console
@@ -610,7 +614,11 @@ export async function serveAudience(document, options, context) {
 
   try {
     const url = new URL(urlString);
-    const result = await replaceContent(url.pathname, document, pluginOptions.overrideMetaFields);
+    const result = await replaceContent(
+      url.pathname,
+      document,
+      pluginOptions.overrideMetadataFields,
+    );
     window.hlx.audience.servedExperience = result || window.location.pathname;
     if (!result) {
       // eslint-disable-next-line no-console
