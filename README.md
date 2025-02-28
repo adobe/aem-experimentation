@@ -17,6 +17,8 @@ The AEM Experimentation plugin supports:
 
 ## Installation
 
+:warning: If you are instrumenting a new site, please switch to [v2](https://github.com/adobe/aem-experimentation/tree/v2).
+
 Add the plugin to your AEM project by running:
 ```sh
 git subtree add --squash --prefix plugins/experimentation git@github.com:adobe/aem-experimentation.git main
