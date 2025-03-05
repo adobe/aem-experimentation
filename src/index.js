@@ -723,6 +723,10 @@ export async function loadEager(document, options, context) {
   onPageActivation(() => {
     adjustRumSampligRate(document, options, context);
   });
+
+  // Only take audience keys for MFE to pick up
+  window.hlx.audieneLibrary = Object.keys(options.audiences);
+
   let res = await runCampaign(document, options, context);
   if (!res) {
     res = await runExperiment(document, options, context);
@@ -733,10 +737,10 @@ export async function loadEager(document, options, context) {
 }
 
 export async function loadLazy(document, options, context) {
-  const pluginOptions = {
-    ...DEFAULT_OPTIONS,
-    ...(options || {}),
-  };
+  // const pluginOptions = {
+  //   ...DEFAULT_OPTIONS,
+  //   ...(options || {}),
+  // };
   // do not show the experimentation pill on prod domains
   if (window.location.hostname.endsWith('.live')
     || (typeof options.isProd === 'function' && options.isProd())
@@ -746,7 +750,25 @@ export async function loadLazy(document, options, context) {
         || options.prodHost === window.location.origin))) {
     return;
   }
+
+  // Send the config to the MFE
+  window.addEventListener('message', (event) => {
+    if (event.data?.type === 'hlx:experimentation-get-config') {
+      try {
+        const safeClone = JSON.parse(JSON.stringify(window.hlx));
+        
+        event.source.postMessage({
+          type: 'hlx:experimentation-config',
+          config: safeClone,
+          source: 'index-js'
+        }, '*');
+      } catch (e) {
+        console.error('Error sending hlx config:', e);
+      }
+    }
+  });
+
   // eslint-disable-next-line import/no-cycle
-  const preview = await import('./preview.js');
-  preview.default(document, pluginOptions, { ...context, getResolvedAudiences });
+  // const preview = await import('./preview.js');
+  // preview.default(document, pluginOptions, { ...context, getResolvedAudiences });
 }
