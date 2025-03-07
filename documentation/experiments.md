@@ -106,9 +106,13 @@ You can also specify start and end dates, as well as toggle the experiment statu
 | Experiment End Date   | 2024-03-31                                                   |
 
 The status defaults to `Active`, and supports `Active`/`True`/`On` as well as `Inactive`/`False`/`Off`.
-Start and end dates are in the flexible JS [Date Time String Format](https://tc39.es/ecma262/multipage/numbers-and-dates.html#sec-date-time-string-format). If the start and/or end dates are specified, the experiment will not run if the user's time lies outside the given window.
+Start and end dates are in the flexible JS [Date Time String Format](https://tc39.es/ecma262/multipage/numbers-and-dates.html#sec-date-time-string-format). 
 
-So you can both use generic dates, like `2024-01-31` or `2024/01/31`, and time-specific dates like `2024-01-31T13:37` or `2024/01/31 1:37 pm`. You can even enforce a specific timezone so your experiment activates when, say, it's 2am GMT+1 by using `2024/1/31 2:00 pm GMT+1` or similar notations.
+##### Date only
+You can use start and end dates like `2024-01-31` or `2024/01/31`. If a start and/or end date is specified, the experiment will _only_ run if the visitor's local time matches the given date.
+
+##### Date & time
+You can also use time-specific dates like `2024-01-31T13:37` or `2024/01/31 1:37 pm`. If you wish to have a globally consistent test, you can enforce a specific timezone so your experiment activates when, say, it's 2am GMT+1 by using `2024/1/31 2:00 pm GMT+1` or similar notations.
 
 ### Simulation
 
