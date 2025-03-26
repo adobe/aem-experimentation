@@ -783,16 +783,12 @@ export async function loadLazy(document, options, context) {
       } catch (e) {
         console.error('Error sending hlx config:', e);
       }
+    } else if (event.data?.type === 'hlx:experimentation-window-reload' && event.data?.action === 'reload') {
+      window.location.reload();
     }
   });
 
-    window.addEventListener('message', function(event) {
-      if (event.data && event.data.type === 'hlx:experimentation-window-reload' && event.data.action === 'reload') {
-          window.location.reload();
-      }
-    });
-
-  // eslint-disable-next-line import/no-cycle
-  // const preview = await import('./preview.js');
-  // preview.default(document, pluginOptions, { ...context, getResolvedAudiences });
+    // eslint-disable-next-line import/no-cycle
+    // const preview = await import('./preview.js');
+    // preview.default(document, pluginOptions, { ...context, getResolvedAudiences });
 }
