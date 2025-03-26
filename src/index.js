@@ -639,13 +639,37 @@ async function getExperimentConfig(pluginOptions, metadata, overrides) {
     return null;
   }
 
+  const thumbnailMeta =
+    document.querySelector('meta[property="og:image:secure_url"]') ||
+    document.querySelector('meta[property="og:image"]');
+  const thumbnail = thumbnailMeta ? thumbnailMeta.getAttribute('content') : '';
+
   const audiences = stringToArray(metadata.audiences).map(toClassName);
 
   const splits = metadata.split
-    // custom split
-    ? stringToArray(metadata.split).map((i) => parseFloat(i) / 100)
-    // even split
-    : [...new Array(pages.length)].map(() => 1 / (pages.length + 1));
+  ? // custom split
+  (() => {
+    const splitValues = stringToArray(metadata.split).map(
+      (i) => parseFloat(i) / 100
+    );
+
+    // If fewer splits than pages, pad with zeros
+    if (splitValues.length < pages.length) {
+      return [
+        ...splitValues,
+        ...Array(pages.length - splitValues.length).fill(0),
+      ];
+    }
+
+    // If more splits than needed, truncate
+    if (splitValues.length > pages.length) {
+      return splitValues.slice(0, pages.length);
+    }
+
+    return splitValues;
+  })()
+: // even split
+  [...new Array(pages.length)].map(() => 1 / (pages.length + 1));
 
   const variantNames = [];
   variantNames.push('control');
@@ -695,6 +719,7 @@ async function getExperimentConfig(pluginOptions, metadata, overrides) {
     startDate,
     variants,
     variantNames,
+    thumbnail,
   };
 
   config.run = (
@@ -970,18 +995,38 @@ export async function loadEager(document, options = {}) {
   ns.campaign = ns.campaigns.find((e) => e.type === 'page');
 }
 
-export async function loadLazy(document, options = {}) {
-  const pluginOptions = { ...DEFAULT_OPTIONS, ...options };
+export async function loadLazy() {
+  // const pluginOptions = { ...DEFAULT_OPTIONS, ...options };
   // do not show the experimentation pill on prod domains
   if (!isDebugEnabled) {
     return;
   }
-  // eslint-disable-next-line import/no-unresolved
-  const preview = await import('https://opensource.adobe.com/aem-experimentation/preview.js');
-  const context = {
-    getMetadata,
-    toClassName,
-    debug,
-  };
-  preview.default.call(context, document, pluginOptions);
+  // Add event listener for experimentation config requests
+  window.addEventListener('message', (event) => {
+    if (event.data?.type === 'hlx:experimentation-get-config') {
+      try {
+        const safeClone = JSON.parse(JSON.stringify(window.hlx));
+
+        event.source.postMessage(
+          {
+            type: 'hlx:experimentation-config',
+            config: safeClone,
+            source: 'index-js',
+          },
+          '*'
+        );
+      } catch (e) {
+        console.error('Error sending hlx config:', e);
+      }
+    }
+  });
+  
+  // // eslint-disable-next-line import/no-unresolved
+  // const preview = await import('https://opensource.adobe.com/aem-experimentation/preview.js');
+  // const context = {
+  //   getMetadata,
+  //   toClassName,
+  //   debug,
+  // };
+  // preview.default.call(context, document, pluginOptions);
 }
