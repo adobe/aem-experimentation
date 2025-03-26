@@ -263,10 +263,29 @@ function getConfigForInstantExperiment(
 
   const splitString = context.getMetadata(`${pluginOptions.experimentsMetaTag}-split`);
   const splits = splitString
-    // custom split
-    ? splitString.split(',').map((i) => parseFloat(i) / 100)
-    // even split fallback
-    : [...new Array(pages.length)].map(() => 1 / (pages.length + 1));
+    ? // custom split
+    (() => {
+      const splitValues = stringToArray(metadata.split).map(
+        (i) => parseFloat(i) / 100
+      );
+
+      // If fewer splits than pages, pad with zeros
+      if (splitValues.length < pages.length) {
+        return [
+          ...splitValues,
+          ...Array(pages.length - splitValues.length).fill(0),
+        ];
+      }
+
+      // If more splits than needed, truncate
+      if (splitValues.length > pages.length) {
+        return splitValues.slice(0, pages.length);
+      }
+
+      return splitValues;
+    })()
+  : // even split
+    [...new Array(pages.length)].map(() => 1 / (pages.length + 1));
 
   config.variantNames.push('control');
   config.variants.control = {
