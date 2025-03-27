@@ -48,10 +48,10 @@ Typically, you'd know you don't have the plugin system if you don't see a refere
     const isExperimentationEnabled = document.head.querySelector('[name^="experiment"],[name^="campaign-"],[name^="audience-"],[property^="campaign:"],[property^="audience:"]')
         || [...document.querySelectorAll('.section-metadata div')].some((d) => d.textContent.match(/Experiment|Campaign|Audience/i));
     if (isExperimentationEnabled) {
-       const {
+      ({
         loadEager: runExperimentation,
         loadLazy: showExperimentationOverlay,
-       } = await import('../plugins/experimentation/src/index.js');
+      } = await import('../plugins/experimentation/src/index.js'));
     }
     ```
 2. Early in the `loadEager` method you'll need to add:
