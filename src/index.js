@@ -639,37 +639,33 @@ async function getExperimentConfig(pluginOptions, metadata, overrides) {
     return null;
   }
 
-  const thumbnailMeta =
-    document.querySelector('meta[property="og:image:secure_url"]') ||
-    document.querySelector('meta[property="og:image"]');
+  const thumbnailMeta = document.querySelector('meta[property="og:image:secure_url"]')
+  || document.querySelector('meta[property="og:image"]');
   const thumbnail = thumbnailMeta ? thumbnailMeta.getAttribute('content') : '';
 
   const audiences = stringToArray(metadata.audiences).map(toClassName);
 
   const splits = metadata.split
-  ? // custom split
-  (() => {
-    const splitValues = stringToArray(metadata.split).map(
-      (i) => parseFloat(i) / 100
-    );
+    ? (() => {
+      const splitValues = stringToArray(metadata.split).map(
+        (i) => parseFloat(i) / 100,
+      );
 
-    // If fewer splits than pages, pad with zeros
-    if (splitValues.length < pages.length) {
-      return [
-        ...splitValues,
-        ...Array(pages.length - splitValues.length).fill(0),
-      ];
-    }
+      // If fewer splits than pages, pad with zeros
+      if (splitValues.length < pages.length) {
+        return [
+          ...splitValues,
+          ...Array(pages.length - splitValues.length).fill(0),
+        ];
+      }
 
-    // If more splits than needed, truncate
-    if (splitValues.length > pages.length) {
-      return splitValues.slice(0, pages.length);
-    }
+      // If more splits than needed, truncate
+      if (splitValues.length > pages.length) {
+        return splitValues.slice(0, pages.length);
+      }
 
-    return splitValues;
-  })()
-: // even split
-  [...new Array(pages.length)].map(() => 1 / (pages.length + 1));
+      return splitValues;
+    })() : [...new Array(pages.length)].map(() => 1 / (pages.length + 1));
 
   const variantNames = [];
   variantNames.push('control');
@@ -996,16 +992,14 @@ export async function loadEager(document, options = {}) {
 }
 
 export async function loadLazy() {
-  // const pluginOptions = { ...DEFAULT_OPTIONS, ...options };
   // do not show the experimentation pill on prod domains
   if (!isDebugEnabled) {
     return;
   }
-  
+
   window.addEventListener('message', async (event) => {
-    // Handle Last-Modified request
     if (event.data && event.data.type === 'hlx:last-modified-request') {
-      const url = event.data.url;
+      const { url } = event.data;
 
       try {
         const response = await fetch(url, {
@@ -1017,23 +1011,21 @@ export async function loadLazy() {
         });
 
         const lastModified = response.headers.get('Last-Modified');
-        console.log('Last-Modified header for', url, ':', lastModified);
 
         event.source.postMessage(
           {
             type: 'hlx:last-modified-response',
-            url: url,
-            lastModified: lastModified,
+            url,
+            lastModified,
             status: response.status,
           },
-          event.origin
+          event.origin,
         );
       } catch (error) {
+        // eslint-disable-next-line no-console
         console.error('Error fetching Last-Modified header:', error);
       }
-    }
-    // Handle experimentation config request
-    else if (event.data?.type === 'hlx:experimentation-get-config') {
+    } else if (event.data?.type === 'hlx:experimentation-get-config') {
       try {
         const safeClone = JSON.parse(JSON.stringify(window.hlx));
 
@@ -1043,27 +1035,17 @@ export async function loadLazy() {
             config: safeClone,
             source: 'index-js',
           },
-          '*'
+          '*',
         );
       } catch (e) {
+        // eslint-disable-next-line no-console
         console.error('Error sending hlx config:', e);
       }
-    }
-    // Handle window reload request
-    else if (
-      event.data?.type === 'hlx:experimentation-window-reload' &&
-      event.data?.action === 'reload'
+    } else if (
+      event.data?.type === 'hlx:experimentation-window-reload'
+      && event.data?.action === 'reload'
     ) {
       window.location.reload();
     }
   });
-  
-  // // eslint-disable-next-line import/no-unresolved
-  // const preview = await import('https://opensource.adobe.com/aem-experimentation/preview.js');
-  // const context = {
-  //   getMetadata,
-  //   toClassName,
-  //   debug,
-  // };
-  // preview.default.call(context, document, pluginOptions);
 }
