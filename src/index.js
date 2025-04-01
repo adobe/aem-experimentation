@@ -32,6 +32,18 @@ export const DEFAULT_OPTIONS = {
 };
 
 /**
+ * Converts a given comma-seperate string to an array.
+ * @param {String|String[]} str The string to convert
+ * @returns an array representing the converted string
+ */
+export function stringToArray(str) {
+  if (Array.isArray(str)) {
+    return str;
+  }
+  return str ? str.split(/[,\n]/).filter((s) => s.trim()) : [];
+}
+
+/**
  * Triggers the callback when the page is actually activated,
  * This is to properly handle speculative page prerendering and marketing events.
  * @param {Function} cb The callback to run
@@ -263,10 +275,9 @@ function getConfigForInstantExperiment(
 
   const splitString = context.getMetadata(`${pluginOptions.experimentsMetaTag}-split`);
   const splits = splitString
-    ? // custom split
-    (() => {
-      const splitValues = stringToArray(metadata.split).map(
-        (i) => parseFloat(i) / 100
+    ? (() => {
+      const splitValues = stringToArray(splitString).map(
+        (i) => parseFloat(i) / 100,
       );
 
       // If fewer splits than pages, pad with zeros
@@ -283,9 +294,7 @@ function getConfigForInstantExperiment(
       }
 
       return splitValues;
-    })()
-  : // even split
-    [...new Array(pages.length)].map(() => 1 / (pages.length + 1));
+    })() : [...new Array(pages.length)].map(() => 1 / (pages.length + 1));
 
   config.variantNames.push('control');
   config.variants.control = {
@@ -755,11 +764,7 @@ export async function loadEager(document, options, context) {
   }
 }
 
-export async function loadLazy(document, options, context) {
-  // const pluginOptions = {
-  //   ...DEFAULT_OPTIONS,
-  //   ...(options || {}),
-  // };
+export async function loadLazy(options) {
   // do not show the experimentation pill on prod domains
   if (window.location.hostname.endsWith('.live')
     || (typeof options.isProd === 'function' && options.isProd())
@@ -771,9 +776,8 @@ export async function loadLazy(document, options, context) {
   }
 
   window.addEventListener('message', async (event) => {
-    // Handle Last-Modified request
     if (event.data && event.data.type === 'hlx:last-modified-request') {
-      const url = event.data.url;
+      const { url } = event.data;
 
       try {
         const response = await fetch(url, {
@@ -789,18 +793,17 @@ export async function loadLazy(document, options, context) {
         event.source.postMessage(
           {
             type: 'hlx:last-modified-response',
-            url: url,
-            lastModified: lastModified,
+            url,
+            lastModified,
             status: response.status,
           },
-          event.origin
+          event.origin,
         );
       } catch (error) {
+        // eslint-disable-next-line no-console
         console.error('Error fetching Last-Modified header:', error);
       }
-    }
-    // Handle experimentation config request
-    else if (event.data?.type === 'hlx:experimentation-get-config') {
+    } else if (event.data?.type === 'hlx:experimentation-get-config') {
       try {
         const safeClone = JSON.parse(JSON.stringify(window.hlx));
 
@@ -810,22 +813,17 @@ export async function loadLazy(document, options, context) {
             config: safeClone,
             source: 'index-js',
           },
-          '*'
+          '*',
         );
       } catch (e) {
+        // eslint-disable-next-line no-console
         console.error('Error sending hlx config:', e);
       }
-    }
-    // Handle window reload request
-    else if (
-      event.data?.type === 'hlx:experimentation-window-reload' &&
-      event.data?.action === 'reload'
+    } else if (
+      event.data?.type === 'hlx:experimentation-window-reload'
+      && event.data?.action === 'reload'
     ) {
       window.location.reload();
     }
   });
-
-    // eslint-disable-next-line import/no-cycle
-    // const preview = await import('./preview.js');
-    // preview.default(document, pluginOptions, { ...context, getResolvedAudiences });
 }
