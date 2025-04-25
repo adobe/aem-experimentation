@@ -122,7 +122,7 @@ Typically, you'd know you don't have the plugin system if you don't see a refere
     ```
     This is mostly used for the authoring overlay, and as such isn't essential to the page rendering, so having it at the end of the lazy phase is good enough.
 
-### On top of the plugin system
+### On top of the plugin system (deprecated)
 
 The easiest way to add the plugin is if your project is set up with the plugin system extension in the boilerplate.
 You'll know you have it if `window.hlx.plugins` is defined on your page.
