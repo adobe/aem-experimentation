@@ -184,7 +184,52 @@ function getAllDataAttributes(el, scope) {
     }, {});
 }
 
-/**
+function getSelectorForElement(el) {
+  const parents = [];
+  let currentElement = el;
+  while (currentElement && currentElement.tagName !== 'HTML') {
+    parents.unshift(currentElement);
+    currentElement = currentElement.parentNode;
+  }
+  return parents
+    .map((element) => (element.id && `#${element.id}`)
+      || (element.className && `.${element.classList[0]}:nth-child(${[...element.parentNode.children].indexOf(element) + 1})`))
+    .join(' ');
+}
+
+function getAllMetadataAttributes(document, scope) {
+  return [...document.querySelectorAll('*')]
+    .filter((el) => Object.keys(el.dataset).some((key) => key.startsWith(scope)))
+    .flatMap((el) => {
+      const attributes = Object.entries(el.dataset)
+        .reduce((acc, [key, val]) => {
+          if (key === scope) {
+            acc.value = val;
+          } else if (key.startsWith(scope)) {
+            const unprefixedKey = key.slice(scope.length);
+            const camelCaseKey = toCamelCase(unprefixedKey);
+            acc[camelCaseKey] = val;
+          }
+          return acc;
+        }, {});
+
+      const selector = getSelectorForElement(el);
+      if (!selector) return [];
+
+      attributes.selector = selector;
+
+      if (attributes.variants || attributes.variant) {
+        attributes.variants = (attributes.variants || attributes.variant)
+          .split(/,\s*\n\s*|\s*,\s*/)
+          .map((url) => url.trim())
+          .filter((url) => url.length > 0);
+      }
+
+      return [attributes];
+    });
+}
+
+/*
  * Gets all the query parameters that are in the given scope.
  * @param {String} scope The scope/prefix for the metadata
  * @returns a map of key/value pairs for the given scope
@@ -268,7 +313,11 @@ async function replaceInner(path, el, selector) {
       newEl = dom.querySelector(selector);
     }
     if (!newEl) {
-      newEl = dom.querySelector(el.tagName === 'MAIN' ? 'main' : 'main > div');
+      if (el.tagName === 'MAIN') {
+        newEl = dom.querySelector('main');
+      } else {
+        newEl = dom.querySelector('main > div') || dom.querySelector('body > div');
+      }
     }
     el.innerHTML = newEl.innerHTML;
     return path;
@@ -551,6 +600,7 @@ async function applyAllModifications(
     document.querySelector('main'),
     pageMetadata,
   );
+
   if (pageNS) {
     pageNS.type = 'page';
     configs.push(pageNS);
@@ -573,6 +623,27 @@ async function applyAllModifications(
       }
     }));
 
+  // AEM CS experimentation modifications
+  const componentDataList = getAllMetadataAttributes(document, type);
+  await Promise.all(componentDataList.map(async (componentMetadata) => {
+    const { selector, ...metadata } = componentMetadata;
+    const component = document.querySelector(selector);
+
+    if (!component) return;
+
+    const componentNS = await modificationsHandler(
+      component,
+      metadata,
+    );
+
+    if (componentNS) {
+      componentNS.type = 'component';
+      debug('component', type, componentNS);
+      configs.push(componentNS);
+    }
+  }));
+
+  // fragment modifications
   if (pageMetadata.manifest) {
     let entries = await getManifestEntriesForCurrentPage(pageMetadata.manifest);
     if (entries) {
@@ -959,15 +1030,18 @@ export async function loadEager(document, options = {}) {
   const pluginOptions = { ...DEFAULT_OPTIONS, ...options };
   setDebugMode(window.location, pluginOptions);
 
+  // wait for DOM to be ready
+  if (document.readyState === 'loading') {
+    await new Promise((resolve) => {
+      document.addEventListener('DOMContentLoaded', resolve);
+    });
+  }
+
   const ns = window.aem || window.hlx || {};
   ns.audiences = await serveAudience(document, pluginOptions);
   ns.experiments = await runExperiment(document, pluginOptions);
   ns.campaigns = await runCampaign(document, pluginOptions);
-
-  // Backward compatibility
-  ns.experiment = ns.experiments.find((e) => e.type === 'page');
-  ns.audience = ns.audiences.find((e) => e.type === 'page');
-  ns.campaign = ns.campaigns.find((e) => e.type === 'page');
+  return ns;
 }
 
 export async function loadLazy(document, options = {}) {
