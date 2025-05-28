@@ -991,7 +991,7 @@ export async function loadEager(document, options = {}) {
   ns.campaign = ns.campaigns.find((e) => e.type === 'page');
 }
 
-export async function loadLazy() {
+export async function loadLazy(document, options = {}) {
   // do not show the experimentation pill on prod domains
   if (!isDebugEnabled) {
     return;
@@ -1028,7 +1028,9 @@ export async function loadLazy() {
     } else if (event.data?.type === 'hlx:experimentation-get-config') {
       try {
         const safeClone = JSON.parse(JSON.stringify(window.hlx));
-
+        if (options.prodHost) {
+          safeClone.prodHost = options.prodHost;
+        }
         event.source.postMessage(
           {
             type: 'hlx:experimentation-config',
