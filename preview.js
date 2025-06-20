@@ -419,7 +419,7 @@ async function decorateExperimentPill({ el, config }, container, options) {
     {
       click: (ev) => {
         if (!ev.target.querySelector('.hlx-hidden')) {
-          el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+          ev.target.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
         }
       },
       mouseenter: () => { el.classList.add('hlx-highlight'); },
@@ -500,7 +500,7 @@ async function decorateCampaignPill({ el, config }, container, options) {
     {
       click: (ev) => {
         if (!ev.target.querySelector('.hlx-hidden')) {
-          el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+          ev.target.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
         }
       },
       mouseenter: () => { el.classList.add('hlx-highlight'); },
@@ -565,7 +565,7 @@ async function decorateAudiencesPill({ el, config }, container, options) {
     {
       click: (ev) => {
         if (!ev.target.querySelector('.hlx-hidden')) {
-          el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+          ev.target.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
         }
       },
       mouseenter: () => { el.classList.add('hlx-highlight'); },
