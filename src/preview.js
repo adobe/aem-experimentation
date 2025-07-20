@@ -53,7 +53,7 @@ function createButton(label) {
   const button = document.createElement('button');
   button.className = 'hlx-badge';
   const text = document.createElement('span');
-  text.innerHTML = label;
+  text.textContent = label;
   button.append(text);
   return button;
 }
@@ -66,10 +66,26 @@ function createPopupItem(item) {
     : [];
   const div = document.createElement('div');
   div.className = `hlx-popup-item${item.isSelected ? ' is-selected' : ''}`;
-  div.innerHTML = `
-    <h5 class="hlx-popup-item-label">${typeof item === 'object' ? item.label : item}</h5>
-    ${item.description ? `<div class="hlx-popup-item-description">${item.description}</div>` : ''}
-    ${actions.length ? `<div class="hlx-popup-item-actions">${actions}</div>` : ''}`;
+
+  const label = document.createElement('h5');
+  label.className = 'hlx-popup-item-label';
+  label.textContent = typeof item === 'object' ? item.label : item;
+  div.appendChild(label);
+
+  if (item.description) {
+    const description = document.createElement('div');
+    description.className = 'hlx-popup-item-description';
+    description.textContent = item.description;
+    div.appendChild(description);
+  }
+
+  if (actions.length) {
+    const actionsDiv = document.createElement('div');
+    actionsDiv.className = 'hlx-popup-item-actions';
+    actionsDiv.innerHTML = actions.join('');
+    div.appendChild(actionsDiv);
+  }
+
   const buttons = [...div.querySelectorAll('.hlx-button a')];
   item.actions?.forEach((action, index) => {
     if (action.onclick) {
@@ -87,13 +103,35 @@ function createPopupDialog(header, items = []) {
     : [];
   const popup = document.createElement('div');
   popup.className = 'hlx-popup hlx-hidden';
-  popup.innerHTML = `
-    <div class="hlx-popup-header">
-      <h5 class="hlx-popup-header-label">${typeof header === 'object' ? header.label : header}</h5>
-      ${header.description ? `<div class="hlx-popup-header-description">${header.description}</div>` : ''}
-      ${actions.length ? `<div class="hlx-popup-header-actions">${actions}</div>` : ''}
-    </div>
-    <div class="hlx-popup-items"></div>`;
+  
+  const headerDiv = document.createElement('div');
+  headerDiv.className = 'hlx-popup-header';
+  
+  const headerLabel = document.createElement('h5');
+  headerLabel.className = 'hlx-popup-header-label';
+  headerLabel.textContent = typeof header === 'object' ? header.label : header;
+  headerDiv.appendChild(headerLabel);
+  
+  if (header.description) {
+    const headerDescription = document.createElement('div');
+    headerDescription.className = 'hlx-popup-header-description';
+    headerDescription.textContent = header.description;
+    headerDiv.appendChild(headerDescription);
+  }
+  
+  if (actions.length) {
+    const headerActions = document.createElement('div');
+    headerActions.className = 'hlx-popup-header-actions';
+    headerActions.innerHTML = actions.join('');
+    headerDiv.appendChild(headerActions);
+  }
+  
+  popup.appendChild(headerDiv);
+  
+  const itemsDiv = document.createElement('div');
+  itemsDiv.className = 'hlx-popup-items';
+  popup.appendChild(itemsDiv);
+  
   const list = popup.querySelector('.hlx-popup-items');
   items.forEach((item) => {
     list.append(createPopupItem(item));
@@ -110,7 +148,9 @@ function createPopupDialog(header, items = []) {
 function createPopupButton(label, header, items) {
   const button = createButton(label);
   const popup = createPopupDialog(header, items);
-  button.innerHTML += '<span class="hlx-open"></span>';
+  const openSpan = document.createElement('span');
+  openSpan.className = 'hlx-open';
+  button.appendChild(openSpan);
   button.append(popup);
   button.addEventListener('click', () => {
     popup.classList.toggle('hlx-hidden');
@@ -126,7 +166,7 @@ function createToggleButton(label) {
   button.setAttribute('aria-pressed', false);
   button.setAttribute('tabindex', 0);
   const text = document.createElement('span');
-  text.innerHTML = label;
+  text.textContent = label;
   button.append(text);
   button.addEventListener('click', () => {
     button.setAttribute('aria-pressed', button.getAttribute('aria-pressed') === 'false');
@@ -173,11 +213,8 @@ function createVariant(experiment, variantName, config, options) {
   experimentURL.searchParams.set(options.experimentsQueryParameter, `${experiment}/${variantName}`);
 
   return {
-    label: `<code>${variantName}</code>`,
-    description: `
-      <p>${variant.label}</p>
-      <p class="percentage">(${percentage} split)</p>
-      <p class="performance"></p>`,
+    label: variantName,
+    description: `${variant.label} (${percentage} split)`,
     actions: [{ label: 'Simulate', href: experimentURL.href }],
     isSelected: selectedVariant === variantName,
   };
@@ -287,40 +324,64 @@ async function fetchRumData(experiment, options) {
 function populatePerformanceMetrics(div, config, {
   richVariants, totals, variantsAsNums, winner,
 }, conversionName = 'click') {
-  // add summary
   const summary = div.querySelector('.hlx-info');
-  summary.innerHTML = `Showing results for ${bigcountformat.format(totals.total_experimentations)} visits and ${bigcountformat.format(totals.total_conversions)} conversions: `;
+  
+  summary.textContent = `Showing results for ${bigcountformat.format(totals.total_experimentations)} visits and ${bigcountformat.format(totals.total_conversions)} conversions: `;
+  
   if (totals.total_conversion_events < 500 && winner.p_value > 0.05) {
-    summary.innerHTML += ` not yet enough data to determine a winner. Keep going until you get ${bigcountformat.format((500 * totals.total_experimentations) / totals.total_conversion_events)} visits.`;
+    summary.textContent += ` not yet enough data to determine a winner. Keep going until you get ${bigcountformat.format((500 * totals.total_experimentations) / totals.total_conversion_events)} visits.`;
   } else if (winner.p_value > 0.05) {
-    summary.innerHTML += ' no significant difference between variants. In doubt, stick with <code>control</code>.';
+    summary.textContent += ' no significant difference between variants. In doubt, stick with control.';
   } else if (winner.variant === 'control') {
-    summary.innerHTML += ' Stick with <code>control</code>. No variant is better than the control.';
+    summary.textContent += ' Stick with control. No variant is better than the control.';
   } else {
-    summary.innerHTML += ` <code>${winner.variant}</code> is the winner.`;
+    summary.textContent += ` ${winner.variant} is the winner.`;
   }
 
-  // add traffic allocation to control and each variant
   config.variantNames.forEach((variantName, index) => {
     const variantDiv = document.querySelector('aem-experimentation-bar')?.shadowRoot.querySelectorAll('.hlx-popup-item')[index];
-    const percentage = variantDiv.querySelector('.percentage');
-    percentage.innerHTML = `
-      <span title="${countformat.format(richVariants[variantName].variant_conversion_events)} real events">${bigcountformat.format(richVariants[variantName].variant_conversions)} ${conversionName} events</span> /
-      <span title="${countformat.format(richVariants[variantName].variant_experimentation_events)} real events">${bigcountformat.format(richVariants[variantName].variant_experimentations)} visits</span>
-      <span>(${percentformat.format(richVariants[variantName].variant_experimentations / totals.total_experimentations)} split)</span>
-    `;
+    const percentage = variantDiv.querySelector('.percentage'); 
+    percentage.innerHTML = '';
+    
+    const eventsSpan = document.createElement('span');
+    eventsSpan.title = `${countformat.format(richVariants[variantName].variant_conversion_events)} real events`;
+    eventsSpan.textContent = `${bigcountformat.format(richVariants[variantName].variant_conversions)} ${conversionName} events`;
+    percentage.appendChild(eventsSpan);  
+    percentage.appendChild(document.createTextNode(' / '));
+    
+    const visitsSpan = document.createElement('span');
+    visitsSpan.title = `${countformat.format(richVariants[variantName].variant_experimentation_events)} real events`;
+    visitsSpan.textContent = `${bigcountformat.format(richVariants[variantName].variant_experimentations)} visits`;
+    percentage.appendChild(visitsSpan); 
+    percentage.appendChild(document.createTextNode(' '));
+    
+    const splitSpan = document.createElement('span');
+    splitSpan.textContent = `(${percentformat.format(richVariants[variantName].variant_experimentations / totals.total_experimentations)} split)`;
+    percentage.appendChild(splitSpan);
   });
 
-  // add click rate and significance to each variant
   variantsAsNums.forEach((result) => {
     const variant = document.querySelector('aem-experimentation-bar')?.shadowRoot.querySelectorAll('.hlx-popup-item')[config.variantNames.indexOf(result.variant)];
     if (variant) {
-      const performance = variant.querySelector('.performance');
-      performance.innerHTML = `
-        <span>${conversionName} conversion rate: ${percentformat.format(result.variant_conversion_rate)}</span>
-        <span>vs. ${percentformat.format(result.control_conversion_rate)}</span>
-        <span title="p value: ${result.p_value}" class="significance ${significanceformat.format(result.p_value).replace(/ /, '-')}">${significanceformat.format(result.p_value)}</span>
-      `;
+      const performance = variant.querySelector('.performance'); 
+      performance.innerHTML = '';
+      
+      const conversionSpan = document.createElement('span');
+      conversionSpan.textContent = `${conversionName} conversion rate: ${percentformat.format(result.variant_conversion_rate)}`;
+      performance.appendChild(conversionSpan);
+      performance.appendChild(document.createTextNode(' '));
+      
+      const vsSpan = document.createElement('span');
+      vsSpan.textContent = `vs. ${percentformat.format(result.control_conversion_rate)}`;
+      performance.appendChild(vsSpan);  
+      performance.appendChild(document.createTextNode(' '));
+      
+      const significanceSpan = document.createElement('span');
+      significanceSpan.title = `p value: ${result.p_value}`;
+      const significanceText = significanceformat.format(result.p_value);
+      significanceSpan.className = `significance ${significanceText.replace(/ /, '-')}`;
+      significanceSpan.textContent = significanceText;
+      performance.appendChild(significanceSpan);
     }
   });
 }
@@ -347,15 +408,12 @@ async function decorateExperimentPill(overlay, options, context) {
     {
       label: config.label,
       description: `
-        <div class="hlx-details">
-          ${config.status}
-          ${config.resolvedAudiences ? ', ' : ''}
-          ${config.resolvedAudiences && config.resolvedAudiences.length ? config.resolvedAudiences[0] : ''}
-          ${config.resolvedAudiences && !config.resolvedAudiences.length ? 'No audience resolved' : ''}
-          ${config.variants[config.variantNames[0]].blocks.length ? ', Blocks: ' : ''}
-          ${config.variants[config.variantNames[0]].blocks.join(',')}
-        </div>
-        <div class="hlx-info">How is it going?</div>`,
+      ${config.status}
+      ${config.resolvedAudiences ? ', ' : ''}
+      ${config.resolvedAudiences && config.resolvedAudiences.length ? config.resolvedAudiences[0] : ''}
+      ${config.resolvedAudiences && !config.resolvedAudiences.length ? 'No audience resolved' : ''}
+      ${config.variants[config.variantNames[0]].blocks.length ? ', Blocks: ' : ''}
+      ${config.variants[config.variantNames[0]].blocks.join(',')} - How is it going?`,
       actions: [
         ...config.manifest ? [{ label: 'Manifest', href: config.manifest }] : [],
         {
