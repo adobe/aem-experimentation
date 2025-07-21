@@ -1,3 +1,10 @@
+## [1.0.4](https://github.com/adobe/aem-experimentation/compare/v1.0.3...v1.0.4) (2025-07-21)
+
+
+### Bug Fixes
+
+* prevent XSS vulnerabilities in preview overlay ([#52](https://github.com/adobe/aem-experimentation/issues/52)) ([960e094](https://github.com/adobe/aem-experimentation/commit/960e094d33a2b11decd3ad1b2e45d5c5c2366175))
+
 ## [1.0.3](https://github.com/adobe/aem-experimentation/compare/v1.0.2...v1.0.3) (2024-10-06)
 
 
