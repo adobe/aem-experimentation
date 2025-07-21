@@ -79,6 +79,11 @@ function createPopupItem(item) {
     div.appendChild(description);
   }
 
+ // Create performance placeholder for experiment variants
+  const performance = document.createElement('p');
+  performance.className = 'performance';
+  div.appendChild(performance);
+
   if (actions.length) {
     const actionsDiv = document.createElement('div');
     actionsDiv.className = 'hlx-popup-item-actions';
