@@ -59,11 +59,6 @@ function createButton(label) {
 }
 
 function createPopupItem(item) {
-  const actions = typeof item === 'object'
-    ? item.actions.map((action) => (action.href
-      ? `<div class="hlx-button"><a href="${action.href}">${action.label}</a></div>`
-      : `<div class="hlx-button"><a href="#">${action.label}</a></div>`))
-    : [];
   const div = document.createElement('div');
   div.className = `hlx-popup-item${item.isSelected ? ' is-selected' : ''}`;
 
@@ -84,10 +79,26 @@ function createPopupItem(item) {
   performance.className = 'performance';
   div.appendChild(performance);
 
-  if (actions.length) {
+  if (typeof item === 'object' && item.actions && item.actions.length) {
     const actionsDiv = document.createElement('div');
     actionsDiv.className = 'hlx-popup-item-actions';
-    actionsDiv.innerHTML = actions.join('');
+    
+    item.actions.forEach((action) => {
+      const buttonDiv = document.createElement('div');
+      buttonDiv.className = 'hlx-button';
+      
+      const link = document.createElement('a');
+      link.href = action.href || '#';
+      link.textContent = action.label;
+      
+      if (action.onclick) {
+        link.addEventListener('click', action.onclick);
+      }
+      
+      buttonDiv.appendChild(link);
+      actionsDiv.appendChild(buttonDiv);
+    });
+    
     div.appendChild(actionsDiv);
   }
 
@@ -101,11 +112,6 @@ function createPopupItem(item) {
 }
 
 function createPopupDialog(header, items = []) {
-  const actions = typeof header === 'object'
-    ? (header.actions || []).map((action) => (action.href
-      ? `<div class="hlx-button"><a href="${action.href}">${action.label}</a></div>`
-      : `<div class="hlx-button"><a href="#">${action.label}</a></div>`))
-    : [];
   const popup = document.createElement('div');
   popup.className = 'hlx-popup hlx-hidden';
   
@@ -120,14 +126,34 @@ function createPopupDialog(header, items = []) {
   if (header.description) {
     const headerDescription = document.createElement('div');
     headerDescription.className = 'hlx-popup-header-description';
-    headerDescription.textContent = header.description;
+    if (typeof header.description === 'string') {
+      headerDescription.textContent = header.description;
+    } else {
+      headerDescription.appendChild(header.description);
+    }
     headerDiv.appendChild(headerDescription);
   }
   
-  if (actions.length) {
+  if (typeof header === 'object' && header.actions && header.actions.length) {
     const headerActions = document.createElement('div');
     headerActions.className = 'hlx-popup-header-actions';
-    headerActions.innerHTML = actions.join('');
+    
+    header.actions.forEach((action) => {
+      const buttonDiv = document.createElement('div');
+      buttonDiv.className = 'hlx-button';
+      
+      const link = document.createElement('a');
+      link.href = action.href || '#';
+      link.textContent = action.label;
+      
+      if (action.onclick) {
+        link.addEventListener('click', action.onclick);
+      }
+      
+      buttonDiv.appendChild(link);
+      headerActions.appendChild(buttonDiv);
+    });
+    
     headerDiv.appendChild(headerActions);
   }
   
@@ -330,17 +356,28 @@ function populatePerformanceMetrics(div, config, {
   richVariants, totals, variantsAsNums, winner,
 }, conversionName = 'click') {
   const summary = div.querySelector('.hlx-info');
-  
   summary.textContent = `Showing results for ${bigcountformat.format(totals.total_experimentations)} visits and ${bigcountformat.format(totals.total_conversions)} conversions: `;
   
   if (totals.total_conversion_events < 500 && winner.p_value > 0.05) {
     summary.textContent += ` not yet enough data to determine a winner. Keep going until you get ${bigcountformat.format((500 * totals.total_experimentations) / totals.total_conversion_events)} visits.`;
   } else if (winner.p_value > 0.05) {
-    summary.textContent += ' no significant difference between variants. In doubt, stick with control.';
+    summary.appendChild(document.createTextNode(' no significant difference between variants. In doubt, stick with '));
+    const noSignificanceControlElement = document.createElement('code');
+    noSignificanceControlElement.textContent = 'control';
+    summary.appendChild(noSignificanceControlElement);
+    summary.appendChild(document.createTextNode('.'));
   } else if (winner.variant === 'control') {
-    summary.textContent += ' Stick with control. No variant is better than the control.';
+    summary.appendChild(document.createTextNode(' Stick with '));
+    const controlWinnerElement = document.createElement('code');
+    controlWinnerElement.textContent = 'control';
+    summary.appendChild(controlWinnerElement);
+    summary.appendChild(document.createTextNode('. No variant is better than the control.'));
   } else {
-    summary.textContent += ` ${winner.variant} is the winner.`;
+    summary.appendChild(document.createTextNode(' '));
+    const variantWinnerElement = document.createElement('code');
+    variantWinnerElement.textContent = winner.variant;
+    summary.appendChild(variantWinnerElement);
+    summary.appendChild(document.createTextNode(' is the winner.'));
   }
 
   config.variantNames.forEach((variantName, index) => {
@@ -408,17 +445,35 @@ async function decorateExperimentPill(overlay, options, context) {
   const conversionName = config.conversionName
     || context.getMetadata('conversion-name')
     || 'click';
+
+  // Create the experiment description container
+  const descriptionContainer = document.createElement('div');
+  const detailsDiv = document.createElement('div');
+  detailsDiv.className = 'hlx-details';
+  detailsDiv.textContent = config.status;
+  if (config.resolvedAudiences) {
+    detailsDiv.appendChild(document.createTextNode(', '));
+  }
+  if (config.resolvedAudiences && config.resolvedAudiences.length) {
+    detailsDiv.appendChild(document.createTextNode(config.resolvedAudiences[0]));
+  } else if (config.resolvedAudiences && !config.resolvedAudiences.length) {
+    detailsDiv.appendChild(document.createTextNode('No audience resolved'));
+  }
+  if (config.variants[config.variantNames[0]].blocks.length) {
+    detailsDiv.appendChild(document.createTextNode(', Blocks: '));
+    detailsDiv.appendChild(document.createTextNode(config.variants[config.variantNames[0]].blocks.join(',')));
+  }
+
+  const infoDiv = document.createElement('div');
+  infoDiv.className = 'hlx-info';
+  infoDiv.textContent = 'How is it going?';
+  descriptionContainer.appendChild(detailsDiv);
+  descriptionContainer.appendChild(infoDiv);
   const pill = createPopupButton(
     `Experiment: ${config.id}`,
     {
       label: config.label,
-      description: `
-      ${config.status}
-      ${config.resolvedAudiences ? ', ' : ''}
-      ${config.resolvedAudiences && config.resolvedAudiences.length ? config.resolvedAudiences[0] : ''}
-      ${config.resolvedAudiences && !config.resolvedAudiences.length ? 'No audience resolved' : ''}
-      ${config.variants[config.variantNames[0]].blocks.length ? ', Blocks: ' : ''}
-      ${config.variants[config.variantNames[0]].blocks.join(',')} - How is it going?`,
+      description: descriptionContainer,
       actions: [
         ...config.manifest ? [{ label: 'Manifest', href: config.manifest }] : [],
         {
@@ -501,16 +556,25 @@ async function decorateCampaignPill(overlay, options, context) {
     ? context.toClassName(usp.get(options.campaignsQueryParameter))
     : null)
     || (usp.has('utm_campaign') ? context.toClassName(usp.get('utm_campaign')) : null);
+  
+  const campaignDescriptionContainer = document.createElement('div');
+  const campaignDetailsDiv = document.createElement('div');
+  campaignDetailsDiv.className = 'hlx-details';
+  if (audiences.length && resolvedAudiences?.length) {
+    campaignDetailsDiv.appendChild(document.createTextNode('Audience: '));
+    campaignDetailsDiv.appendChild(document.createTextNode(resolvedAudiences[0]));
+  } else if (audiences.length && !resolvedAudiences?.length) {
+    campaignDetailsDiv.textContent = 'No audience resolved';
+  } else if (!audiences.length || !resolvedAudiences) {
+    campaignDetailsDiv.textContent = 'No audience configured';
+  }
+campaignDescriptionContainer.appendChild(campaignDetailsDiv);
+
   const pill = createPopupButton(
     `Campaign: ${campaign || 'default'}`,
     {
       label: 'Campaigns on this page:',
-      description: `
-        <div class="hlx-details">
-          ${audiences.length && resolvedAudiences?.length ? `Audience: ${resolvedAudiences[0]}` : ''}
-          ${audiences.length && !resolvedAudiences?.length ? 'No audience resolved' : ''}
-          ${!audiences.length || !resolvedAudiences ? 'No audience configured' : ''}
-        </div>`,
+      description: campaignDescriptionContainer,
     },
     [
       createCampaign('default', !campaign || !isActive, options),
