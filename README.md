@@ -193,9 +193,16 @@ Fragment replacement is handled by async observer, which may execute before or a
 
 ## Extensibility & integrations
 
-If you need to further integrate the experimentation plugin with custom analytics reporting or other 3rd-party libraries, you can listen for the `aem:experimentation` event:
+The experimentation plugin exposes APIs that allow you to integrate with custom analytics reporting or other 3rd-party libraries.
+
+### Available APIs
+
+#### Events
 ```js
-document.addEventListener('aem:experimentation', (ev) => console.log(ev.detail));
+document.addEventListener('aem:experimentation', (event) => {
+  const { experiment, variant, type, element } = event.detail;
+  // Your custom code here
+});
 ```
 
 The event details will contain one of 3 possible sets of properties:
@@ -213,9 +220,101 @@ The event details will contain one of 3 possible sets of properties:
   - `element`: the DOM element that was modified
   - `campaign`: the campaign that was resolved
 
-Additionally, you can leverage the following global JS objects `window.hlx.experiments`, `window.hlx.audiences` and `window.hlx.campaigns`.
-Those will each be an array of objects containing:
-  - `type`: one of `page`, `section` or `fragment`
-  - `el`: the DOM element that was modified
-  - `servedExperience`: the URL for the content that was inlined for that experience
-  - `config`: an object containing the config details
+#### Global Objects
+
+The `window.hlx.experiments`, `window.hlx.audiences` and `window.hlx.campaigns` arrays each contain objects with:
+- `type`: one of `page`, `section` or `fragment`
+- `el`: the DOM element that was modified
+- `config`: an object containing the config details (see Config Object Structure below)
+- `servedExperience`: the URL for the content that was inlined (only present if content was actually served)
+
+#### Config Object Structure
+```javascript
+// Example structure:
+{
+  id: "hero-test",
+  label: "Experiment hero-test", 
+  selectedVariant: "challenger-1",
+  status: "active",
+  variantNames: ["control", "challenger-1", "challenger-2"],
+  audiences: ["mobile", "us"],
+  resolvedAudiences: ["mobile"],
+  run: true,
+  startDate: Date,
+  endDate: Date,
+  servedExperience: "/variant-url",
+  variants: {
+    control: {
+      percentageSplit: "0.25",
+      pages: ["/current-page"],
+      label: "Control"
+    },
+    "challenger-1": {
+      percentageSplit: "0.25", 
+      pages: ["/variant-page"],
+      label: "Challenger 1"
+    }
+  }
+}
+```
+
+### Analytics Integration Example
+
+**Note:** This example assumes you already have Adobe Analytics (AppMeasurement) implemented on your site.
+
+#### Using Event Listener (Recommended)
+The event-based approach ensures your analytics fire at the right time when experiments are applied:
+
+```javascript
+document.addEventListener('aem:experimentation', (event) => {
+  const { experiment, variant, type } = event.detail;
+  
+  // Send to Adobe Analytics
+  if (window.s) {
+    window.s.tl(true, 'o', 'Experiment Applied', {
+      eVar1: experiment,
+      eVar2: variant,
+      eVar3: type
+    });
+  }
+  
+  // Or push to data layer
+  window.dataLayer = window.dataLayer || [];
+  window.dataLayer.push({
+    event: 'experiment_applied',
+    experiment_id: experiment,
+    experiment_variant: variant,
+    experiment_type: type
+  });
+});
+```
+
+#### Using Global Object
+For more detailed experiment data, you can access the full experiment configuration. Make sure to wait for the experiment to load:
+
+```javascript
+window.addEventListener('load', () => {
+  const experiment = window.hlx?.experiment;
+  if (experiment) {
+    // Send to Adobe Analytics with more details
+    if (window.s) {
+      window.s.tl(true, 'o', 'Experiment View', {
+        eVar1: experiment.id,
+        eVar2: experiment.selectedVariant,
+        eVar3: experiment.status,
+        eVar4: experiment.audiences?.join(',') || 'none'
+      });
+    }
+    
+    // Or push to data layer with full context
+    window.dataLayer = window.dataLayer || [];
+    window.dataLayer.push({
+      event: 'experiment_view',
+      experiment_id: experiment.id,
+      experiment_variant: experiment.selectedVariant,
+      experiment_status: experiment.status,
+      experiment_audiences: experiment.audiences?.join(',') || 'none'
+    });
+  }
+});
+```
