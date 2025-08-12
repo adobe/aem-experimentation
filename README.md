@@ -193,128 +193,237 @@ Fragment replacement is handled by async observer, which may execute before or a
 
 ## Extensibility & integrations
 
-The experimentation plugin exposes APIs that allow you to integrate with custom analytics reporting or other 3rd-party libraries.
+The experimentation plugin exposes APIs that allow you to integrate with analytics platforms and other 3rd-party libraries.
+
+### How It Works
+
+The plugin exposes experiment data through two mechanisms:
+1. **Global Objects** - Access complete experiment details after page load
+2. **Events** - React immediately when experiments are applied (V2 only)
 
 ### Available APIs
 
 #### Events
-```js
+
+Listen for the `aem:experimentation` event to react when experiments, campaigns, or audiences are applied:
+
+```javascript
 document.addEventListener('aem:experimentation', (event) => {
-  const { experiment, variant, type, element } = event.detail;
-  // Your custom code here
+  console.log(event.detail);
 });
 ```
 
 The event details will contain one of 3 possible sets of properties:
-- For experiments:
-  - `type`: `experiment`
-  - `element`: the DOM element that was modified
-  - `experiment`: the experiment name
-  - `variant`: the variant name that was served
-- For audiences:
-  - `type`: `audience`
-  - `element`: the DOM element that was modified
-  - `audience`: the audience that was resolved
-- For campaigns:
-  - `type`: `campaign`
-  - `element`: the DOM element that was modified
-  - `campaign`: the campaign that was resolved
+
+**For experiments:**
+```javascript
+{
+  type: 'experiment',
+  element: DOMElement, // the DOM element that was modified
+  experiment: 'experiment-name', // the experiment name
+  variant: 'variant-name' // the variant name that was served
+}
+```
+
+**For campaigns:**
+```javascript
+{
+  type: 'campaign',
+  element: DOMElement, // the DOM element that was modified
+  campaign: 'campaign-name' // the campaign that was resolved
+}
+```
+
+**For audiences:**
+```javascript
+{
+  type: 'audience',
+  element: DOMElement, // the DOM element that was modified
+  audience: 'audience-name' // the audience that was resolved
+}
+```
 
 #### Global Objects
 
-The `window.hlx.experiments`, `window.hlx.audiences` and `window.hlx.campaigns` arrays each contain objects with:
-- `type`: one of `page`, `section` or `fragment`
-- `el`: the DOM element that was modified
-- `config`: an object containing the config details (see Config Object Structure below)
-- `servedExperience`: the URL for the content that was inlined (only present if content was actually served)
+You can leverage the following global JS objects:
 
-#### Config Object Structure
 ```javascript
-// Example structure:
-{
-  id: "hero-test",
-  label: "Experiment hero-test", 
-  selectedVariant: "challenger-1",
-  status: "active",
-  variantNames: ["control", "challenger-1", "challenger-2"],
-  audiences: ["mobile", "us"],
-  resolvedAudiences: ["mobile"],
-  run: true,
-  startDate: Date,
-  endDate: Date,
-  servedExperience: "/variant-url",
-  variants: {
-    control: {
-      percentageSplit: "0.25",
-      pages: ["/current-page"],
-      label: "Control"
-    },
-    "challenger-1": {
-      percentageSplit: "0.25", 
-      pages: ["/variant-page"],
-      label: "Challenger 1"
+// All experiments (page, section, fragment levels)  
+const allExperiments = window.hlx.experiments;
+
+// All audiences (page, section, fragment levels)
+const allAudiences = window.hlx.audiences;
+
+// All campaigns (page, section, fragment levels)
+const allCampaigns = window.hlx.campaigns;
+
+// backward compatibility with V1
+const experiment = window.hlx.experiment;
+const audience = window.hlx.audience;
+const campaign = window.hlx.campaign;
+```
+
+**Array Structure:**
+
+`window.hlx.experiments`, `window.hlx.audiences`, and `window.hlx.campaigns` are each an array of objects containing:
+
+```javascript
+[
+  {
+    type: 'page', // one of: page, section, fragment
+    el: DOMElement, // the DOM element that was modified
+    servedExperience: '/variant-url', // the URL for the content that was inlined (if any)
+    config: { /* see Complete Reference section below */ }
+  }
+  // ... more objects for section/fragment level modifications
+]
+```
+
+#### Adobe Products Integration
+
+For Adobe Analytics, Target, and Adobe Journey Optimizer integration:
+
+**Event-driven integration (recommended):**
+```javascript
+document.addEventListener('aem:experimentation', (event) => {
+  if (event.detail.type === 'experiment') {
+    const { experiment, variant } = event.detail;
+    
+    // For ALL Adobe products (Analytics, Target, AJO): Push to Adobe Client Data Layer
+    // Requires Adobe Experience Platform Tags to forward data to these platforms
+    window.adobeDataLayer = window.adobeDataLayer || [];
+    window.adobeDataLayer.push({
+      event: 'experiment-applied',
+      experiment: {
+        id: experiment,
+        variant: variant
+      }
+    });
+    
+    // For Analytics ONLY: Direct API integration (alternative to data layer)
+    if (window.s) {
+      s.eVar1 = experiment;
+      s.eVar2 = variant;
+      s.events = "event1";
+      s.linkTrackVars = "eVar1,eVar2,events";
+      s.linkTrackEvents = "event1";
+      s.tl(true, 'o', 'Experiment Applied');
     }
+  }
+});
+```
+
+**Global object access:**
+```javascript
+if (window.hlx.experiment) {
+  // For ALL Adobe products (Analytics, Target, AJO): Push to Adobe Client Data Layer
+  // Requires Adobe Experience Platform Tags to forward data to these platforms
+  window.adobeDataLayer = window.adobeDataLayer || [];
+  window.adobeDataLayer.push({
+    event: 'experiment-applied',
+    experiment: {
+      id: window.hlx.experiment.id,
+      variant: window.hlx.experiment.selectedVariant
+    }
+  });
+  
+  // For Analytics ONLY: Direct API integration (alternative to data layer)
+  if (window.s) {
+    s.eVar1 = window.hlx.experiment.id;
+    s.eVar2 = window.hlx.experiment.selectedVariant;
+    s.events = "event1";
+    s.linkTrackVars = "eVar1,eVar2,events";
+    s.linkTrackEvents = "event1";
+    s.tl(true, 'o', 'Experiment View');
   }
 }
 ```
 
-### Analytics Integration Example
+> **Important**: 
+> - **Adobe Target & AJO**: Only work via Adobe Client Data Layer + Adobe Experience Platform Tags. No direct JavaScript APIs available.
+> - **Adobe Analytics**: Works both ways - data layer approach OR direct API calls (`window.s.tl()`).
+> - **Adobe Experience Platform Tags**: Required for Target and AJO integration to listen to `adobeDataLayer` events and forward data to those platforms.
 
-**Note:** This example assumes you already have Adobe Analytics (AppMeasurement) implemented on your site.
+#### Google Tag Manager / Google Analytics
 
-#### Using Event Listener (Recommended)
-The event-based approach ensures your analytics fire at the right time when experiments are applied:
-
+*Event-driven integration (recommended):*
 ```javascript
 document.addEventListener('aem:experimentation', (event) => {
-  const { experiment, variant, type } = event.detail;
-  
-  // Send to Adobe Analytics
-  if (window.s) {
-    window.s.tl(true, 'o', 'Experiment Applied', {
-      eVar1: experiment,
-      eVar2: variant,
-      eVar3: type
-    });
-  }
-  
-  // Or push to data layer
-  window.dataLayer = window.dataLayer || [];
-  window.dataLayer.push({
-    event: 'experiment_applied',
-    experiment_id: experiment,
-    experiment_variant: variant,
-    experiment_type: type
-  });
-});
-```
-
-#### Using Global Object
-For more detailed experiment data, you can access the full experiment configuration. Make sure to wait for the experiment to load:
-
-```javascript
-window.addEventListener('load', () => {
-  const experiment = window.hlx?.experiment;
-  if (experiment) {
-    // Send to Adobe Analytics with more details
-    if (window.s) {
-      window.s.tl(true, 'o', 'Experiment View', {
-        eVar1: experiment.id,
-        eVar2: experiment.selectedVariant,
-        eVar3: experiment.status,
-        eVar4: experiment.audiences?.join(',') || 'none'
-      });
-    }
+  if (event.detail.type === 'experiment') {
+    const { experiment, variant } = event.detail;
     
-    // Or push to data layer with full context
     window.dataLayer = window.dataLayer || [];
     window.dataLayer.push({
       event: 'experiment_view',
-      experiment_id: experiment.id,
-      experiment_variant: experiment.selectedVariant,
-      experiment_status: experiment.status,
-      experiment_audiences: experiment.audiences?.join(',') || 'none'
+      experiment_id: experiment,
+      experiment_variant: variant
     });
   }
 });
 ```
+
+*Global object access:*
+```javascript
+if (window.hlx.experiment) {
+  window.dataLayer = window.dataLayer || [];
+  window.dataLayer.push({
+    event: 'experiment_view',
+    experiment_id: window.hlx.experiment.id,
+    experiment_variant: window.hlx.experiment.selectedVariant
+  });
+}
+```
+
+#### Tealium
+
+*Event-driven integration (recommended):*
+```javascript
+document.addEventListener('aem:experimentation', (event) => {
+  if (event.detail.type === 'experiment') {
+    const { experiment, variant } = event.detail;
+    
+    window.utag_data = window.utag_data || {};
+    window.utag_data.cms_experiment = `${experiment}:${variant}`;
+  }
+});
+```
+
+*Global object access:*
+```javascript
+// Example from UPS implementation
+if (window.hlx.experiment) {
+  window.utag_data = window.utag_data || {};
+  window.utag_data.cms_experiment = `${window.hlx.experiment.id}:${window.hlx.experiment.selectedVariant}`;
+}
+```
+
+#### Implementation Notes
+
+- **Customer responsibility**: You implement the analytics integration in your project code
+- **Runtime only**: Data is available at runtime - no backend integration provided  
+- **Project-specific**: Integration depends on your analytics setup and project structure
+- **Existing analytics required**: Your analytics platform must already be implemented
+
+### Complete Reference
+
+#### Experiment Config Structure
+
+Here's the complete experiment config structure available in `window.hlx.experiment`:
+
+```javascript
+{
+  id: "experiment-name",
+  selectedVariant: "challenger-1", 
+  status: "active",
+  variantNames: ["control", "challenger-1"],
+  audiences: ["mobile", "desktop"],
+  resolvedAudiences: ["mobile"],
+  run: true,
+  variants: {
+    control: { percentageSplit: "0.5", pages: ["/current"], label: "Control" },
+    "challenger-1": { percentageSplit: "0.5", pages: ["/variant"], label: "Challenger 1" }
+  }
+}
+```
+
+> **Note**: For analytics integration, you typically only need `id` and `selectedVariant`. The full config structure above is available if you need detailed experiment settings for custom logic.
