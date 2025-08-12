@@ -195,8 +195,8 @@ Fragment replacement is handled by async observer, which may execute before or a
 
 The experimentation plugin exposes APIs that allow you to integrate with analytics platforms and other 3rd-party libraries.
 The plugin exposes experiment data through two mechanisms:
-1. **Global Objects** - Access complete experiment details after page load
-2. **Events** - React immediately when experiments are applied (V2 only)
+1. **Events** - React immediately when experiments are applied (V2 only)
+2. **Global Objects** - Access complete experiment details after page load
 
 ### Available APIs
 
