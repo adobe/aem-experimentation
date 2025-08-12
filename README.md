@@ -265,8 +265,7 @@ For Adobe Analytics, Target, and Adobe Journey Optimizer integration:
 ```javascript
 // Check if experiment is running
 if (window.hlx.experiment) {
-  // For ALL Adobe products (Analytics, Target, AJO): Push to Adobe Client Data Layer
-  // Requires Adobe Experience Platform Tags to forward data to these platforms
+  // Option 1: Adobe Client Data Layer (works with all Adobe products via Tags)
   window.adobeDataLayer = window.adobeDataLayer || [];
   window.adobeDataLayer.push({
     event: 'experiment-applied',
@@ -276,22 +275,50 @@ if (window.hlx.experiment) {
     }
   });
   
-  // For Analytics ONLY: Direct API integration (alternative to data layer)
-  if (window.s) {
-    s.eVar1 = window.hlx.experiment.id;
-    s.eVar2 = window.hlx.experiment.selectedVariant;
-    s.events = "event1";
-    s.linkTrackVars = "eVar1,eVar2,events";
-    s.linkTrackEvents = "event1";
-    s.tl(true, 'o', 'Experiment View');
+  // Option 2: Modern Web SDK integration (AEP + Analytics)
+  if (window.alloy) {
+    alloy("sendEvent", {
+      xdm: {
+        eventType: "decisioning.propositionDisplay",
+        timestamp: new Date().toISOString(),
+        _experience: {
+          decisioning: {
+            propositions: [{
+              id: window.hlx.experiment.id,
+              scope: "page",
+              items: [{
+                id: window.hlx.experiment.selectedVariant,
+                schema: "https://ns.adobe.com/personalization/default-content-item"
+              }]
+            }],
+            propositionEventType: {
+              display: 1
+            }
+          }
+        }
+      },
+      data: {
+        __adobe: {
+          analytics: {
+            eVar1: window.hlx.experiment.id,
+            eVar2: window.hlx.experiment.selectedVariant,
+            events: "event1"
+          }
+        },
+        experiment: {
+          id: window.hlx.experiment.id,
+          variant: window.hlx.experiment.selectedVariant,
+          timestamp: Date.now()
+        }
+      }
+    });
   }
 }
 ```
 
-> **Important**: 
-> - **Adobe Target & AJO**: Only work via Adobe Client Data Layer + Adobe Experience Platform Tags. No direct JavaScript APIs available.
-> - **Adobe Analytics**: Works both ways - data layer approach OR direct API calls (`window.s.tl()`).
-> - **Adobe Experience Platform Tags**: Required for Target and AJO integration to listen to `adobeDataLayer` events and forward data to those platforms.
+> **Choose your approach**: 
+> - **Option 1**: Works with all Adobe products via Tags (simplest)
+> - **Option 2**: Direct Web SDK with full AEP + Analytics integration
 
 #### Google Tag Manager / Google Analytics
 
