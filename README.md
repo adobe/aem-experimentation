@@ -196,3 +196,138 @@ For detailed implementation instructions on the different features, please read 
 - [Audiences](/documentation/audiences.md)
 - [Campaigns](/documentation/campaigns.md)
 - [Experiments](/documentation/experiments.md)
+
+## Extensibility & integrations
+
+The experimentation plugin exposes APIs that allow you to integrate with analytics platforms and other 3rd-party libraries.
+
+### Available APIs
+
+#### Global Objects
+
+Access experiment data through global JavaScript objects:
+
+```javascript
+// Current implementation
+const experiment = window.hlx.experiment;
+const audience = window.hlx.audience;
+const campaign = window.hlx.campaign;
+```
+
+### Integration Examples
+
+#### Adobe Analytics, Target & AJO Integration
+
+For Adobe Analytics, Target, and Adobe Journey Optimizer integration:
+
+```javascript
+// Check if experiment is running
+if (window.hlx.experiment) {
+  // Option 1: Adobe Client Data Layer (works with all Adobe products via Tags)
+  window.adobeDataLayer = window.adobeDataLayer || [];
+  window.adobeDataLayer.push({
+    event: 'experiment-applied',
+    experiment: {
+      id: window.hlx.experiment.id,
+      variant: window.hlx.experiment.selectedVariant
+    }
+  });
+  
+  // Option 2: Modern Web SDK integration (AEP + Analytics)
+  if (window.alloy) {
+    alloy("sendEvent", {
+      xdm: {
+        eventType: "decisioning.propositionDisplay",
+        timestamp: new Date().toISOString(),
+        _experience: {
+          decisioning: {
+            propositions: [{
+              id: window.hlx.experiment.id,
+              scope: "page",
+              items: [{
+                id: window.hlx.experiment.selectedVariant,
+                schema: "https://ns.adobe.com/personalization/default-content-item"
+              }]
+            }],
+            propositionEventType: {
+              display: 1
+            }
+          }
+        }
+      },
+      data: {
+        __adobe: {
+          analytics: {
+            eVar1: window.hlx.experiment.id,
+            eVar2: window.hlx.experiment.selectedVariant,
+            events: "event1"
+          }
+        },
+        experiment: {
+          id: window.hlx.experiment.id,
+          variant: window.hlx.experiment.selectedVariant,
+          timestamp: Date.now()
+        }
+      }
+    });
+  }
+}
+```
+
+> **Choose your approach**: 
+> - **Option 1**: Works with all Adobe products via Tags (simplest)
+> - **Option 2**: Direct Web SDK with full AEP + Analytics integration
+
+#### Google Tag Manager / Google Analytics
+
+```javascript
+if (window.hlx.experiment) {
+  window.dataLayer = window.dataLayer || [];
+  window.dataLayer.push({
+    event: 'experiment_view',
+    experiment_id: window.hlx.experiment.id,
+    experiment_variant: window.hlx.experiment.selectedVariant
+  });
+}
+```
+
+#### Tealium
+
+```javascript
+// Example from UPS implementation
+if (window.hlx.experiment) {
+  window.utag_data = window.utag_data || {};
+  window.utag_data.cms_experiment = `${window.hlx.experiment.id}:${window.hlx.experiment.selectedVariant}`;
+}
+```
+
+### Implementation Notes
+
+- **Customer responsibility**: You implement the analytics integration in your project code
+- **Runtime only**: Data is available at runtime - no backend integration provided  
+- **Project-specific**: Integration depends on your analytics setup and project structure
+- **Existing analytics required**: Your analytics platform must already be implemented
+
+### Complete Reference
+
+#### Experiment Config Structure
+
+Here's the complete experiment config structure available in `window.hlx.experiment`:
+
+```javascript
+{
+  id: "experiment-name",
+  selectedVariant: "challenger-1", 
+  status: "active",
+  variantNames: ["control", "challenger-1"],
+  audiences: ["mobile", "desktop"],
+  resolvedAudiences: ["mobile"],
+  run: true,
+  variants: {
+    control: { percentageSplit: "0.5", pages: ["/current"], label: "Control" },
+    "challenger-1": { percentageSplit: "0.5", pages: ["/variant"], label: "Challenger 1" }
+  }
+}
+```
+
+> **Note**: For analytics integration, you typically only need `id` and `selectedVariant`. The full config structure above is available if you need detailed experiment settings for custom logic.
