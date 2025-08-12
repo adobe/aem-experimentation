@@ -196,3 +196,153 @@ For detailed implementation instructions on the different features, please read 
 - [Audiences](/documentation/audiences.md)
 - [Campaigns](/documentation/campaigns.md)
 - [Experiments](/documentation/experiments.md)
+
+## Extensibility & integrations
+
+The experimentation plugin exposes APIs that allow you to integrate with analytics platforms and other 3rd-party libraries.
+
+### Available APIs
+
+#### Global Objects
+
+Access experiment data through global JavaScript objects:
+
+```javascript
+// Current implementation
+const experiment = window.hlx.experiment;
+const audience = window.hlx.audience;
+const campaign = window.hlx.campaign;
+```
+
+#### Events (V2 only)
+
+Listen for the `aem:experimentation` event to react when experiments, campaigns, or audiences are applied:
+
+```javascript
+document.addEventListener('aem:experimentation', (event) => {
+  console.log(event.detail);
+});
+```
+
+> **Note**: Events are available in V2 of the plugin. For complete event-driven integration capabilities, see the [V2 Extensibility & integrations documentation](https://github.com/adobe/aem-experimentation/blob/v2/README.md#extensibility--integrations).
+
+The event details will contain one of 3 possible sets of properties:
+
+- **For experiments:**
+```javascript
+{
+  type: 'experiment',
+  element: DOMElement, // the DOM element that was modified
+  experiment: 'experiment-name', // the experiment name
+  variant: 'variant-name' // the variant name that was served
+}
+```
+
+- **For campaigns:**
+```javascript
+{
+  type: 'campaign',
+  element: DOMElement, // the DOM element that was modified
+  campaign: 'campaign-name' // the campaign that was resolved
+}
+```
+
+- **For audiences:**
+```javascript
+{
+  type: 'audience',
+  element: DOMElement, // the DOM element that was modified
+  audience: 'audience-name' // the audience that was resolved
+}
+```
+
+### Integration Examples
+
+#### Adobe Analytics, Target & AJO Integration
+
+For Adobe Analytics, Target, and Adobe Journey Optimizer integration:
+
+```javascript
+// Check if experiment is running
+if (window.hlx.experiment) {
+  // For ALL Adobe products (Analytics, Target, AJO): Push to Adobe Client Data Layer
+  // Requires Adobe Experience Platform Tags to forward data to these platforms
+  window.adobeDataLayer = window.adobeDataLayer || [];
+  window.adobeDataLayer.push({
+    event: 'experiment-applied',
+    experiment: {
+      id: window.hlx.experiment.id,
+      variant: window.hlx.experiment.selectedVariant
+    }
+  });
+  
+  // For Analytics ONLY: Direct API integration (alternative to data layer)
+  if (window.s) {
+    s.eVar1 = window.hlx.experiment.id;
+    s.eVar2 = window.hlx.experiment.selectedVariant;
+    s.events = "event1";
+    s.linkTrackVars = "eVar1,eVar2,events";
+    s.linkTrackEvents = "event1";
+    s.tl(true, 'o', 'Experiment View');
+  }
+}
+```
+
+> **Important**: 
+> - **Adobe Target & AJO**: Only work via Adobe Client Data Layer + Adobe Experience Platform Tags. No direct JavaScript APIs available.
+> - **Adobe Analytics**: Works both ways - data layer approach OR direct API calls (`window.s.tl()`).
+> - **Adobe Experience Platform Tags**: Required for Target and AJO integration to listen to `adobeDataLayer` events and forward data to those platforms.
+
+#### Google Tag Manager / Google Analytics
+
+```javascript
+if (window.hlx.experiment) {
+  window.dataLayer = window.dataLayer || [];
+  window.dataLayer.push({
+    event: 'experiment_view',
+    experiment_id: window.hlx.experiment.id,
+    experiment_variant: window.hlx.experiment.selectedVariant
+  });
+}
+```
+
+#### Tealium
+
+```javascript
+// Example from UPS implementation
+if (window.hlx.experiment) {
+  window.utag_data = window.utag_data || {};
+  window.utag_data.cms_experiment = `${window.hlx.experiment.id}:${window.hlx.experiment.selectedVariant}`;
+}
+```
+
+### Implementation Notes
+
+- **Customer responsibility**: You implement the analytics integration in your project code
+- **Runtime only**: Data is available at runtime - no backend integration provided  
+- **Project-specific**: Integration depends on your analytics setup and project structure
+- **Existing analytics required**: Your analytics platform must already be implemented
+
+### Complete Reference
+
+#### Experiment Config Structure
+
+Here's the complete experiment config structure available in `window.hlx.experiment`:
+
+```javascript
+{
+  id: "experiment-name",
+  selectedVariant: "challenger-1", 
+  status: "active",
+  variantNames: ["control", "challenger-1"],
+  audiences: ["mobile", "desktop"],
+  resolvedAudiences: ["mobile"],
+  run: true,
+  variants: {
+    control: { percentageSplit: "0.5", pages: ["/current"], label: "Control" },
+    "challenger-1": { percentageSplit: "0.5", pages: ["/variant"], label: "Challenger 1" }
+  }
+}
+```
+
+> **Note**: For analytics integration, you typically only need `id` and `selectedVariant`. The full config structure above is available if you need detailed experiment settings for custom logic.
