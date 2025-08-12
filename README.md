@@ -282,14 +282,25 @@ const campaign = window.hlx.campaign;
 
 For Adobe Analytics, Target, and Adobe Journey Optimizer integration:
 
-- **Event-driven integration:**
+- **Event-driven approach:**
 ```javascript
 document.addEventListener('aem:experimentation', (event) => {
   if (event.detail.type === 'experiment') {
     const { experiment, variant } = event.detail;
     
-    // For ALL Adobe products (Analytics, Target, AJO): Push to Adobe Client Data Layer
-    // Requires Adobe Experience Platform Tags to forward data to these platforms
+    // Choose your Adobe integration method below
+  }
+});
+```
+
+<details>
+<summary>Option 1: Adobe Client Data Layer (works with all Adobe products via Tags)</summary>
+
+```javascript
+document.addEventListener('aem:experimentation', (event) => {
+  if (event.detail.type === 'experiment') {
+    const { experiment, variant } = event.detail;
+    
     window.adobeDataLayer = window.adobeDataLayer || [];
     window.adobeDataLayer.push({
       event: 'experiment-applied',
@@ -298,50 +309,130 @@ document.addEventListener('aem:experimentation', (event) => {
         variant: variant
       }
     });
+  }
+});
+```
+
+</details>
+
+<details>
+<summary>Option 2: Web SDK with XDM (direct AEP + Analytics integration)</summary>
+
+```javascript
+document.addEventListener('aem:experimentation', (event) => {
+  if (event.detail.type === 'experiment') {
+    const { experiment, variant } = event.detail;
     
-    // For Analytics ONLY: Direct API integration (alternative to data layer)
-    if (window.s) {
-      s.eVar1 = experiment;
-      s.eVar2 = variant;
-      s.events = "event1";
-      s.linkTrackVars = "eVar1,eVar2,events";
-      s.linkTrackEvents = "event1";
-      s.tl(true, 'o', 'Experiment Applied');
+    if (window.alloy) {
+      alloy("sendEvent", {
+        xdm: {
+          eventType: "decisioning.propositionDisplay",
+          timestamp: new Date().toISOString(),
+          _experience: {
+            decisioning: {
+              propositions: [{
+                id: experiment,
+                scope: "page",
+                items: [{
+                  id: variant,
+                  schema: "https://ns.adobe.com/personalization/default-content-item"
+                }]
+              }],
+              propositionEventType: {
+                display: 1
+              }
+            }
+          }
+        },
+        data: {
+          __adobe: {
+            analytics: {
+              eVar1: experiment,
+              eVar2: variant,
+              events: "event1"
+            }
+          }
+        }
+      });
     }
   }
 });
 ```
 
-- **Global object access:**
+</details>
+
+- **Global object approach:**
 ```javascript
 if (window.hlx.experiment) {
-  // For ALL Adobe products (Analytics, Target, AJO): Push to Adobe Client Data Layer
-  // Requires Adobe Experience Platform Tags to forward data to these platforms
+  const { id, selectedVariant } = window.hlx.experiment;
+  
+  // Choose your Adobe integration method below
+}
+```
+
+<details>
+<summary>Option 1: Adobe Client Data Layer (works with all Adobe products via Tags)</summary>
+
+```javascript
+if (window.hlx.experiment) {
+  const { id, selectedVariant } = window.hlx.experiment;
+  
   window.adobeDataLayer = window.adobeDataLayer || [];
   window.adobeDataLayer.push({
     event: 'experiment-applied',
     experiment: {
-      id: window.hlx.experiment.id,
-      variant: window.hlx.experiment.selectedVariant
+      id: id,
+      variant: selectedVariant
     }
   });
+}
+```
+
+</details>
+
+<details>
+<summary>Option 2: Web SDK with XDM (direct AEP + Analytics integration)</summary>
+
+```javascript
+if (window.hlx.experiment) {
+  const { id, selectedVariant } = window.hlx.experiment;
   
-  // For Analytics ONLY: Direct API integration (alternative to data layer)
-  if (window.s) {
-    s.eVar1 = window.hlx.experiment.id;
-    s.eVar2 = window.hlx.experiment.selectedVariant;
-    s.events = "event1";
-    s.linkTrackVars = "eVar1,eVar2,events";
-    s.linkTrackEvents = "event1";
-    s.tl(true, 'o', 'Experiment View');
+  if (window.alloy) {
+    alloy("sendEvent", {
+      xdm: {
+        eventType: "decisioning.propositionDisplay",
+        timestamp: new Date().toISOString(),
+        _experience: {
+          decisioning: {
+            propositions: [{
+              id: id,
+              scope: "page",
+              items: [{
+                id: selectedVariant,
+                schema: "https://ns.adobe.com/personalization/default-content-item"
+              }]
+            }],
+            propositionEventType: {
+              display: 1
+            }
+          }
+        }
+      },
+      data: {
+        __adobe: {
+          analytics: {
+            eVar1: id,
+            eVar2: selectedVariant,
+            events: "event1"
+          }
+        }
+      }
+    });
   }
 }
 ```
 
-> **Important**: 
-> - **Adobe Target & AJO**: Only work via Adobe Client Data Layer + Adobe Experience Platform Tags. No direct JavaScript APIs available.
-> - **Adobe Analytics**: Works both ways - data layer approach OR direct API calls (`window.s.tl()`).
-> - **Adobe Experience Platform Tags**: Required for Target and AJO integration to listen to `adobeDataLayer` events and forward data to those platforms.
+</details>
 
 #### Google Tag Manager / Google Analytics
 
