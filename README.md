@@ -193,29 +193,327 @@ Fragment replacement is handled by async observer, which may execute before or a
 
 ## Extensibility & integrations
 
-If you need to further integrate the experimentation plugin with custom analytics reporting or other 3rd-party libraries, you can listen for the `aem:experimentation` event:
-```js
-document.addEventListener('aem:experimentation', (ev) => console.log(ev.detail));
+The experimentation plugin exposes APIs that allow you to integrate with analytics platforms and other 3rd-party libraries.
+The plugin exposes experiment data through two mechanisms:
+1. **Events** - React immediately when experiments are applied (V2 only)
+2. **Global Objects** - Access complete experiment details after page load
+
+### Available APIs
+
+#### Events
+
+Listen for the `aem:experimentation` event to react when experiments, campaigns, or audiences are applied:
+
+```javascript
+document.addEventListener('aem:experimentation', (event) => {
+  console.log(event.detail);
+});
 ```
 
 The event details will contain one of 3 possible sets of properties:
-- For experiments:
-  - `type`: `experiment`
-  - `element`: the DOM element that was modified
-  - `experiment`: the experiment name
-  - `variant`: the variant name that was served
-- For audiences:
-  - `type`: `audience`
-  - `element`: the DOM element that was modified
-  - `audience`: the audience that was resolved
-- For campaigns:
-  - `type`: `campaign`
-  - `element`: the DOM element that was modified
-  - `campaign`: the campaign that was resolved
 
-Additionally, you can leverage the following global JS objects `window.hlx.experiments`, `window.hlx.audiences` and `window.hlx.campaigns`.
-Those will each be an array of objects containing:
-  - `type`: one of `page`, `section` or `fragment`
-  - `el`: the DOM element that was modified
-  - `servedExperience`: the URL for the content that was inlined for that experience
-  - `config`: an object containing the config details
+- **For experiments:**
+```javascript
+{
+  type: 'experiment',
+  element: DOMElement, // the DOM element that was modified
+  experiment: 'experiment-name', // the experiment name
+  variant: 'variant-name' // the variant name that was served
+}
+```
+
+- **For campaigns:**
+```javascript
+{
+  type: 'campaign',
+  element: DOMElement, // the DOM element that was modified
+  campaign: 'campaign-name' // the campaign that was resolved
+}
+```
+
+- **For audiences:**
+```javascript
+{
+  type: 'audience',
+  element: DOMElement, // the DOM element that was modified
+  audience: 'audience-name' // the audience that was resolved
+}
+```
+
+#### Global Objects
+
+You can leverage the following global JS objects:
+
+```javascript
+// All experiments (page, section, fragment levels)  
+const allExperiments = window.hlx.experiments;
+
+// All audiences (page, section, fragment levels)
+const allAudiences = window.hlx.audiences;
+
+// All campaigns (page, section, fragment levels)
+const allCampaigns = window.hlx.campaigns;
+
+// backward compatibility with V1
+const experiment = window.hlx.experiment;
+const audience = window.hlx.audience;
+const campaign = window.hlx.campaign;
+```
+
+- **Array Structure:**
+
+`window.hlx.experiments`, `window.hlx.audiences`, and `window.hlx.campaigns` are each an array of objects containing:
+
+```javascript
+[
+  {
+    type: 'page', // one of: page, section, fragment
+    el: DOMElement, // the DOM element that was modified
+    servedExperience: '/variant-url', // the URL for the content that was inlined (if any)
+    config: { /* see Complete Reference section below */ }
+  }
+  // ... more objects for section/fragment level modifications
+]
+```
+
+### Integration Examples
+
+#### Adobe Analytics, Target & AJO Integration
+
+For Adobe Analytics, Target, and Adobe Journey Optimizer integration:
+
+- **Event-driven approach:**
+```javascript
+document.addEventListener('aem:experimentation', (event) => {
+  if (event.detail.type === 'experiment') {
+    const { experiment, variant } = event.detail;
+    
+    // Choose your Adobe integration method below
+  }
+});
+```
+
+<details>
+<summary>Option 1: Adobe Client Data Layer (works with all Adobe products via Tags)</summary>
+
+```javascript
+document.addEventListener('aem:experimentation', (event) => {
+  if (event.detail.type === 'experiment') {
+    const { experiment, variant } = event.detail;
+    
+    window.adobeDataLayer = window.adobeDataLayer || [];
+    window.adobeDataLayer.push({
+      event: 'experiment-applied',
+      experiment: {
+        id: experiment,
+        variant: variant
+      }
+    });
+  }
+});
+```
+
+</details>
+
+<details>
+<summary>Option 2: Web SDK with XDM (direct AEP + Analytics integration)</summary>
+
+```javascript
+document.addEventListener('aem:experimentation', (event) => {
+  if (event.detail.type === 'experiment') {
+    const { experiment, variant } = event.detail;
+    
+    if (window.alloy) {
+      alloy("sendEvent", {
+        xdm: {
+          eventType: "decisioning.propositionDisplay",
+          timestamp: new Date().toISOString(),
+          _experience: {
+            decisioning: {
+              propositions: [{
+                id: experiment,
+                scope: "page",
+                items: [{
+                  id: variant,
+                  schema: "https://ns.adobe.com/personalization/default-content-item"
+                }]
+              }],
+              propositionEventType: {
+                display: 1
+              }
+            }
+          }
+        },
+        data: {
+          __adobe: {
+            analytics: {
+              eVar1: experiment,
+              eVar2: variant,
+              events: "event1"
+            }
+          }
+        }
+      });
+    }
+  }
+});
+```
+
+</details>
+
+- **Global object approach:**
+```javascript
+if (window.hlx.experiment) {
+  const { id, selectedVariant } = window.hlx.experiment;
+  
+  // Choose your Adobe integration method below
+}
+```
+
+<details>
+<summary>Option 1: Adobe Client Data Layer (works with all Adobe products via Tags)</summary>
+
+```javascript
+if (window.hlx.experiment) {
+  const { id, selectedVariant } = window.hlx.experiment;
+  
+  window.adobeDataLayer = window.adobeDataLayer || [];
+  window.adobeDataLayer.push({
+    event: 'experiment-applied',
+    experiment: {
+      id: id,
+      variant: selectedVariant
+    }
+  });
+}
+```
+
+</details>
+
+<details>
+<summary>Option 2: Web SDK with XDM (direct AEP + Analytics integration)</summary>
+
+```javascript
+if (window.hlx.experiment) {
+  const { id, selectedVariant } = window.hlx.experiment;
+  
+  if (window.alloy) {
+    alloy("sendEvent", {
+      xdm: {
+        eventType: "decisioning.propositionDisplay",
+        timestamp: new Date().toISOString(),
+        _experience: {
+          decisioning: {
+            propositions: [{
+              id: id,
+              scope: "page",
+              items: [{
+                id: selectedVariant,
+                schema: "https://ns.adobe.com/personalization/default-content-item"
+              }]
+            }],
+            propositionEventType: {
+              display: 1
+            }
+          }
+        }
+      },
+      data: {
+        __adobe: {
+          analytics: {
+            eVar1: id,
+            eVar2: selectedVariant,
+            events: "event1"
+          }
+        }
+      }
+    });
+  }
+}
+```
+
+</details>
+
+#### Google Tag Manager / Google Analytics
+
+- **Event-driven integration (recommended):**
+```javascript
+document.addEventListener('aem:experimentation', (event) => {
+  if (event.detail.type === 'experiment') {
+    const { experiment, variant } = event.detail;
+    
+    window.dataLayer = window.dataLayer || [];
+    window.dataLayer.push({
+      event: 'experiment_view',
+      experiment_id: experiment,
+      experiment_variant: variant
+    });
+  }
+});
+```
+
+- **Global object access:**
+```javascript
+if (window.hlx.experiment) {
+  window.dataLayer = window.dataLayer || [];
+  window.dataLayer.push({
+    event: 'experiment_view',
+    experiment_id: window.hlx.experiment.id,
+    experiment_variant: window.hlx.experiment.selectedVariant
+  });
+}
+```
+
+#### Tealium
+
+- **Event-driven integration (recommended):**
+```javascript
+document.addEventListener('aem:experimentation', (event) => {
+  if (event.detail.type === 'experiment') {
+    const { experiment, variant } = event.detail;
+    
+    window.utag_data = window.utag_data || {};
+    window.utag_data.cms_experiment = `${experiment}:${variant}`;
+  }
+});
+```
+
+- **Global object access:**
+```javascript
+// Example from UPS implementation
+if (window.hlx.experiment) {
+  window.utag_data = window.utag_data || {};
+  window.utag_data.cms_experiment = `${window.hlx.experiment.id}:${window.hlx.experiment.selectedVariant}`;
+}
+```
+
+### Implementation Notes
+
+- **Customer responsibility**: You implement the analytics integration in your project code
+- **Runtime only**: Data is available at runtime - no backend integration provided  
+- **Project-specific**: Integration depends on your analytics setup and project structure
+- **Existing analytics required**: Your analytics platform must already be implemented
+
+### Complete Reference
+
+#### Experiment Config Structure
+
+Here's the complete experiment config structure available in `window.hlx.experiment`:
+
+```javascript
+{
+  id: "experiment-name",
+  selectedVariant: "challenger-1", 
+  status: "active",
+  variantNames: ["control", "challenger-1"],
+  audiences: ["mobile", "desktop"],
+  resolvedAudiences: ["mobile"],
+  run: true,
+  variants: {
+    control: { percentageSplit: "0.5", pages: ["/current"], label: "Control" },
+    "challenger-1": { percentageSplit: "0.5", pages: ["/variant"], label: "Challenger 1" }
+  }
+}
+```
+
+> **Note**: For analytics integration, you typically only need `id` and `selectedVariant`. The full config structure above is available if you need detailed experiment settings for custom logic.
