@@ -194,9 +194,6 @@ Fragment replacement is handled by async observer, which may execute before or a
 ## Extensibility & integrations
 
 The experimentation plugin exposes APIs that allow you to integrate with analytics platforms and other 3rd-party libraries.
-
-### How It Works
-
 The plugin exposes experiment data through two mechanisms:
 1. **Global Objects** - Access complete experiment details after page load
 2. **Events** - React immediately when experiments are applied (V2 only)
@@ -215,7 +212,7 @@ document.addEventListener('aem:experimentation', (event) => {
 
 The event details will contain one of 3 possible sets of properties:
 
-**For experiments:**
+- **For experiments:**
 ```javascript
 {
   type: 'experiment',
@@ -225,7 +222,7 @@ The event details will contain one of 3 possible sets of properties:
 }
 ```
 
-**For campaigns:**
+- **For campaigns:**
 ```javascript
 {
   type: 'campaign',
@@ -234,7 +231,7 @@ The event details will contain one of 3 possible sets of properties:
 }
 ```
 
-**For audiences:**
+- **For audiences:**
 ```javascript
 {
   type: 'audience',
@@ -263,7 +260,7 @@ const audience = window.hlx.audience;
 const campaign = window.hlx.campaign;
 ```
 
-**Array Structure:**
+- **Array Structure:**
 
 `window.hlx.experiments`, `window.hlx.audiences`, and `window.hlx.campaigns` are each an array of objects containing:
 
@@ -279,11 +276,13 @@ const campaign = window.hlx.campaign;
 ]
 ```
 
-#### Adobe Products Integration
+### Integration Examples
+
+#### Adobe Analytics, Target & AJO Integration
 
 For Adobe Analytics, Target, and Adobe Journey Optimizer integration:
 
-**Event-driven integration (recommended):**
+- **Event-driven integration:**
 ```javascript
 document.addEventListener('aem:experimentation', (event) => {
   if (event.detail.type === 'experiment') {
@@ -313,7 +312,7 @@ document.addEventListener('aem:experimentation', (event) => {
 });
 ```
 
-**Global object access:**
+- **Global object access:**
 ```javascript
 if (window.hlx.experiment) {
   // For ALL Adobe products (Analytics, Target, AJO): Push to Adobe Client Data Layer
@@ -346,7 +345,7 @@ if (window.hlx.experiment) {
 
 #### Google Tag Manager / Google Analytics
 
-*Event-driven integration (recommended):*
+- **Event-driven integration (recommended):**
 ```javascript
 document.addEventListener('aem:experimentation', (event) => {
   if (event.detail.type === 'experiment') {
@@ -362,7 +361,7 @@ document.addEventListener('aem:experimentation', (event) => {
 });
 ```
 
-*Global object access:*
+- **Global object access:**
 ```javascript
 if (window.hlx.experiment) {
   window.dataLayer = window.dataLayer || [];
@@ -376,7 +375,7 @@ if (window.hlx.experiment) {
 
 #### Tealium
 
-*Event-driven integration (recommended):*
+- **Event-driven integration (recommended):**
 ```javascript
 document.addEventListener('aem:experimentation', (event) => {
   if (event.detail.type === 'experiment') {
@@ -388,7 +387,7 @@ document.addEventListener('aem:experimentation', (event) => {
 });
 ```
 
-*Global object access:*
+- **Global object access:**
 ```javascript
 // Example from UPS implementation
 if (window.hlx.experiment) {
@@ -397,7 +396,7 @@ if (window.hlx.experiment) {
 }
 ```
 
-#### Implementation Notes
+### Implementation Notes
 
 - **Customer responsibility**: You implement the analytics integration in your project code
 - **Runtime only**: Data is available at runtime - no backend integration provided  
