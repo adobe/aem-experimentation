@@ -214,48 +214,6 @@ const audience = window.hlx.audience;
 const campaign = window.hlx.campaign;
 ```
 
-#### Events (V2 only)
-
-Listen for the `aem:experimentation` event to react when experiments, campaigns, or audiences are applied:
-
-```javascript
-document.addEventListener('aem:experimentation', (event) => {
-  console.log(event.detail);
-});
-```
-
-> **Note**: Events are available in V2 of the plugin. For complete event-driven integration capabilities, see the [V2 Extensibility & integrations documentation](https://github.com/adobe/aem-experimentation/blob/v2/README.md#extensibility--integrations).
-
-The event details will contain one of 3 possible sets of properties:
-
-- **For experiments:**
-```javascript
-{
-  type: 'experiment',
-  element: DOMElement, // the DOM element that was modified
-  experiment: 'experiment-name', // the experiment name
-  variant: 'variant-name' // the variant name that was served
-}
-```
-
-- **For campaigns:**
-```javascript
-{
-  type: 'campaign',
-  element: DOMElement, // the DOM element that was modified
-  campaign: 'campaign-name' // the campaign that was resolved
-}
-```
-
-- **For audiences:**
-```javascript
-{
-  type: 'audience',
-  element: DOMElement, // the DOM element that was modified
-  audience: 'audience-name' // the audience that was resolved
-}
-```
-
 ### Integration Examples
 
 #### Adobe Analytics, Target & AJO Integration
