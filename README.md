@@ -119,10 +119,10 @@ Edit your html `<head>` and set configure the RUM sampling like:
 ...
 <!-- insert this script tag before loading aem.js or lib-franklin.js -->
 <script>
-  window.RUM_SAMPLING_RATE = document.head.querySelector('[name^="experiment"],[name^="campaign-"],[name^="audience-"]')
+  window.SAMPLE_PAGEVIEWS_AT_RATE = document.head.querySelector('[name^="experiment"],[name^="campaign-"],[name^="audience-"]')
     || [...document.querySelectorAll('.section-metadata div')].some((d) => d.textContent.match(/Experiment|Campaign|Audience/i))
-    ? 10
-    : 100;
+    ? 'high'
+    : '';
 </script>
 <script type="module" src="/scripts/aem.js"></script>
 <script type="module" src="/scripts/scripts.js"></script>
