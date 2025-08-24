@@ -32,6 +32,18 @@ export const DEFAULT_OPTIONS = {
 };
 
 /**
+ * Converts a given comma-seperate string to an array.
+ * @param {String|String[]} str The string to convert
+ * @returns an array representing the converted string
+ */
+export function stringToArray(str) {
+  if (Array.isArray(str)) {
+    return str;
+  }
+  return str ? str.split(/[,\n]/).filter((s) => s.trim()) : [];
+}
+
+/**
  * Triggers the callback when the page is actually activated,
  * This is to properly handle speculative page prerendering and marketing events.
  * @param {Function} cb The callback to run
@@ -263,10 +275,26 @@ function getConfigForInstantExperiment(
 
   const splitString = context.getMetadata(`${pluginOptions.experimentsMetaTag}-split`);
   const splits = splitString
-    // custom split
-    ? splitString.split(',').map((i) => parseFloat(i) / 100)
-    // even split fallback
-    : [...new Array(pages.length)].map(() => 1 / (pages.length + 1));
+    ? (() => {
+      const splitValues = stringToArray(splitString).map(
+        (i) => parseFloat(i) / 100,
+      );
+
+      // If fewer splits than pages, pad with zeros
+      if (splitValues.length < pages.length) {
+        return [
+          ...splitValues,
+          ...Array(pages.length - splitValues.length).fill(0),
+        ];
+      }
+
+      // If more splits than needed, truncate
+      if (splitValues.length > pages.length) {
+        return splitValues.slice(0, pages.length);
+      }
+
+      return splitValues;
+    })() : [...new Array(pages.length)].map(() => 1 / (pages.length + 1));
 
   config.variantNames.push('control');
   config.variants.control = {
@@ -723,6 +751,10 @@ export async function loadEager(document, options, context) {
   onPageActivation(() => {
     adjustRumSampligRate(document, options, context);
   });
+
+  // Only take audience keys for MFE to pick up
+  window.hlx.audieneLibrary = Object.keys(options.audiences);
+
   let res = await runCampaign(document, options, context);
   if (!res) {
     res = await runExperiment(document, options, context);
@@ -732,11 +764,7 @@ export async function loadEager(document, options, context) {
   }
 }
 
-export async function loadLazy(document, options, context) {
-  const pluginOptions = {
-    ...DEFAULT_OPTIONS,
-    ...(options || {}),
-  };
+export async function loadLazy(options) {
   // do not show the experimentation pill on prod domains
   if (window.location.hostname.endsWith('.live')
     || (typeof options.isProd === 'function' && options.isProd())
@@ -746,7 +774,56 @@ export async function loadLazy(document, options, context) {
         || options.prodHost === window.location.origin))) {
     return;
   }
-  // eslint-disable-next-line import/no-cycle
-  const preview = await import('./preview.js');
-  preview.default(document, pluginOptions, { ...context, getResolvedAudiences });
+
+  window.addEventListener('message', async (event) => {
+    if (event.data && event.data.type === 'hlx:last-modified-request') {
+      const { url } = event.data;
+
+      try {
+        const response = await fetch(url, {
+          method: 'HEAD',
+          cache: 'no-store',
+          headers: {
+            'Cache-Control': 'no-cache',
+          },
+        });
+
+        const lastModified = response.headers.get('Last-Modified');
+
+        event.source.postMessage(
+          {
+            type: 'hlx:last-modified-response',
+            url,
+            lastModified,
+            status: response.status,
+          },
+          event.origin,
+        );
+      } catch (error) {
+        // eslint-disable-next-line no-console
+        console.error('Error fetching Last-Modified header:', error);
+      }
+    } else if (event.data?.type === 'hlx:experimentation-get-config') {
+      try {
+        const safeClone = JSON.parse(JSON.stringify(window.hlx));
+
+        event.source.postMessage(
+          {
+            type: 'hlx:experimentation-config',
+            config: safeClone,
+            source: 'index-js',
+          },
+          '*',
+        );
+      } catch (e) {
+        // eslint-disable-next-line no-console
+        console.error('Error sending hlx config:', e);
+      }
+    } else if (
+      event.data?.type === 'hlx:experimentation-window-reload'
+      && event.data?.action === 'reload'
+    ) {
+      window.location.reload();
+    }
+  });
 }
