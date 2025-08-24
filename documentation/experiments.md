@@ -70,12 +70,31 @@ If you need to be really granular, decimal numbers are also supported, like `33.
 
 #### Code-level experiments
 
+These experiments are about testing different variants of components (≠ style and logic).
+When the experiment will be run the body will have a class that reflects the variant of the session.
+To make the component work according to the experiment it is necessary to add logic checking if body class includes "variant" or "control".
+If "control" is included the component will need to run the control version of the code, otherwise the challenger version.
+
 Note that the above assumes you have different content variants to serve, but if you want to run a pure code-based A/B Test, this is also achievable via:
 
 | Metadata            |           |
 |---------------------|-----------|
 | Experiment          | Hero Test |
 | Experiment Variants | 2         |
+
+
+```js
+export default function decorate(block) {
+  if (document.body.classList.contains('variant-challenger-1')) {
+    // experiment variant 1
+  }
+  else if (document.body.classList.contains('variant-challenger-2')) {
+    // experiment variant 2
+  } else {
+    // control variant
+  }
+```
+
 
 This will create just 2 variants, without touching the content, and you'll be able to target those based on the `experiment-hero-test` and `variant-control`/`variant-challenger-1`/`variant-challenger-2` CSS classes that will be set on the `<body>` element.
 
