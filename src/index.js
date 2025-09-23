@@ -990,14 +990,14 @@ export async function loadEager(document, options = {}) {
   ns.experiment = ns.experiments.find((e) => e.type === 'page');
   ns.audience = ns.audiences.find((e) => e.type === 'page');
   ns.campaign = ns.campaigns.find((e) => e.type === 'page');
+
+  if (isDebugEnabled) {
+    setupCommunicationLayer(pluginOptions);
+  }
 }
 
-export async function loadLazy(document, options = {}) {
-  // do not show the experimentation pill on prod domains
-  if (!isDebugEnabled) {
-    return;
-  }
-
+// Support new Rail UI communication
+function setupCommunicationLayer(options) {
   window.addEventListener('message', async (event) => {
     if (event.data && event.data.type === 'hlx:last-modified-request') {
       const { url } = event.data;
@@ -1051,4 +1051,11 @@ export async function loadLazy(document, options = {}) {
       window.location.reload();
     }
   });
+}
+
+export async function loadLazy(document, options = {}) {
+  // do not show the experimentation pill on prod domains
+  if (!isDebugEnabled) {
+    return;
+  }
 }
