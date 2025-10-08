@@ -707,7 +707,7 @@ async function getExperimentConfig(pluginOptions, metadata, overrides) {
 
   const config = {
     id,
-    label: `Experiment ${metadata.value || metadata.experiment}`,
+    label: metadata.label || `Experiment ${metadata.value || metadata.experiment}`,
     status: metadata.status || 'active',
     audiences,
     endDate,
