@@ -151,7 +151,7 @@ runEager.call(document, {
 
   // the storage type used to persist data between page views
   // (for instance to remember what variant in an experiment the user was served)
-  storage: window.SessionStorage,
+  storage: window.sessionStorage,
 
   /* Audiences related properties */
   // See more details on the dedicated Audiences page linked below
