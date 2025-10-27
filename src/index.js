@@ -130,7 +130,6 @@ export function updateExperimentationConsent(consented) {
   debug('Experimentation consent updated:', consented);
 }
 
-
 /**
  * Fires a Real User Monitoring (RUM) event based on the provided type and configuration.
  * @param {string} type - the type of event to be fired ("experiment", "campaign", or "audience")
@@ -730,7 +729,7 @@ async function getExperimentConfig(pluginOptions, metadata, overrides) {
   const startDate = metadata.startDate ? new Date(metadata.startDate) : null;
   const endDate = metadata.endDate ? new Date(metadata.endDate) : null;
   const requiresConsent = metadata.requiresConsent === 'true';
-  
+
   const config = {
     id,
     label: `Experiment ${metadata.value || metadata.experiment}`,
