@@ -48,6 +48,8 @@ export const DEFAULT_OPTIONS = {
   decorateFunction: () => {},
 };
 
+const CONSENT_STORAGE_KEY = 'experimentation-consented';
+
 /**
  * Converts a given comma-seperate string to an array.
  * @param {String|String[]} str The string to convert
@@ -85,6 +87,49 @@ async function onPageActivation(cb) {
     cb();
   }
 }
+
+/**
+ * Reads the current consent status from localStorage.
+ * @returns {Boolean} true if consent is given, false otherwise
+ */
+function getConsentFromStorage() {
+  try {
+    return localStorage.getItem(CONSENT_STORAGE_KEY) === 'true';
+  } catch (error) {
+    debug('Failed to read consent from localStorage:', error);
+    return false;
+  }
+}
+
+/**
+ * Writes the consent status to localStorage.
+ * @param {Boolean} consented Whether the user has consented
+ */
+function setConsentInStorage(consented) {
+  try {
+    localStorage.setItem(CONSENT_STORAGE_KEY, consented ? 'true' : 'false');
+  } catch (error) {
+    debug('Failed to save consent to localStorage:', error);
+  }
+}
+
+/**
+ * Checks if user has given consent for experimentation.
+ * @returns {Boolean} true if consent is given, false otherwise
+ */
+export function hasExperimentationConsent() {
+  return getConsentFromStorage();
+}
+
+/**
+ * Sets the user consent status for experimentation.
+ * @param {Boolean} consented Whether the user has consented to experimentation
+ */
+export function updateExperimentationConsent(consented) {
+  setConsentInStorage(consented);
+  debug('Experimentation consent updated:', consented);
+}
+
 
 /**
  * Fires a Real User Monitoring (RUM) event based on the provided type and configuration.
@@ -684,12 +729,14 @@ async function getExperimentConfig(pluginOptions, metadata, overrides) {
 
   const startDate = metadata.startDate ? new Date(metadata.startDate) : null;
   const endDate = metadata.endDate ? new Date(metadata.endDate) : null;
-
+  const requiresConsent = metadata.requiresConsent === 'true';
+  
   const config = {
     id,
     label: `Experiment ${metadata.value || metadata.experiment}`,
     status: metadata.status || 'active',
     audiences,
+    requiresConsent,
     endDate,
     resolvedAudiences,
     startDate,
@@ -706,6 +753,8 @@ async function getExperimentConfig(pluginOptions, metadata, overrides) {
     && (!overrides.audience || audiences.includes(overrides.audience))
     && (!startDate || startDate <= Date.now())
     && (!endDate || endDate > Date.now())
+    // experiment has consent if required
+    && (!requiresConsent || hasExperimentationConsent())
   );
 
   if (!config.run) {

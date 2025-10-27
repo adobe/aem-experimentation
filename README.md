@@ -10,6 +10,7 @@ The AEM Experimentation plugin supports:
 - :busts_in_silhouette: serving different content variations to different audiences, including custom audience definitions for your project that can be either resolved directly in-browser or against a trusted backend API.
 - :money_with_wings: serving different content variations based on marketing campaigns you are running, so that you can easily track email and/or social campaigns
 - :chart_with_upwards_trend: running A/B test experiments on a set of variants to measure and improve the conversion on your site. This works particularly with our :chart: [RUM conversion tracking plugin](https://github.com/adobe/franklin-rum-conversion).
+- :shield: privacy-compliant experimentation with built-in consent management support for GDPR, CCPA, and other privacy regulations
 - :rocket: easy simulation of each experience and basic reporting leveraging in-page overlays
 
 ## Installation
@@ -199,6 +200,152 @@ The plugin exposes experiment data through two mechanisms:
 2. **Global Objects** - Access complete experiment details after page load
 
 ### Available APIs
+
+#### Consent Management
+
+The plugin provides consent management APIs for privacy compliance. Experiments can be configured to require user consent before running.
+
+**APIs:**
+
+```javascript
+import { 
+  hasExperimentationConsent, 
+  updateExperimentationConsent 
+} from './plugins/experimentation/src/index.js';
+
+// Check if user has consented to experimentation
+const hasConsent = hasExperimentationConsent();
+
+// Update consent status (call this from your consent management platform)
+updateExperimentationConsent(true);  // or false to revoke consent
+```
+
+**Requiring consent for an experiment:**
+
+Add the `Experiment Requires Consent` metadata property:
+
+| Metadata              |                                                              |
+|-----------------------|--------------------------------------------------------------|
+| Experiment            | Hero Test                                                    |
+| Experiment Variants   | /variant-1, /variant-2                                       |
+| Experiment Requires Consent | true                                                   |
+
+**Implementation:**
+
+You can integrate consent management in two ways:
+
+1. **In your `experiment-loader.js`** (recommended) - keeps all experimentation code together
+2. **In your `scripts.js`** - if you need consent for other purposes beyond experimentation
+
+<details>
+<summary>Recommended: Integrate in experiment-loader.js</summary>
+
+```javascript
+// experiment-loader.js
+import {
+  updateExperimentationConsent,
+  hasExperimentationConsent,
+} from '../plugins/experimentation/src/index.js';
+
+/**
+ * Initialize consent management
+ * Choose ONE of the setup functions based on your CMP
+ */
+function initConsent() {
+  // OPTION 1: OneTrust
+  function setupOneTrustConsent() {
+    function handleOneTrustConsent() {
+      const activeGroups = window.OnetrustActiveGroups || '';
+      const hasConsent = activeGroups.includes('C0003') || activeGroups.includes('C0004');
+      updateExperimentationConsent(hasConsent);
+    }
+    window.OptanonWrapper = function() {
+      handleOneTrustConsent();
+    };
+  }
+
+  // OPTION 2: Cookiebot
+  function setupCookiebotConsent() {
+    function handleCookiebotConsent() {
+      const preferences = window.Cookiebot?.consent?.preferences || false;
+      const marketing = window.Cookiebot?.consent?.marketing || false;
+      updateExperimentationConsent(preferences || marketing);
+    }
+    window.addEventListener('CookiebotOnConsentReady', handleCookiebotConsent);
+    window.addEventListener('CookiebotOnAccept', handleCookiebotConsent);
+  }
+
+  // OPTION 3: Custom Consent Banner
+  function setupCustomConsent() {
+    document.addEventListener('consent-updated', (event) => {
+      updateExperimentationConsent(event.detail.experimentation);
+    });
+  }
+
+  // Choose ONE:
+  setupOneTrustConsent();     // or setupCookiebotConsent() or setupCustomConsent()
+}
+
+export async function runExperimentation(document, config) {
+  if (!isExperimentationEnabled()) {
+    return null;
+  }
+
+  // Initialize consent BEFORE loading experimentation
+  initConsent();
+
+  const { loadEager } = await import('../plugins/experimentation/src/index.js');
+  return loadEager(document, config);
+}
+
+// Export consent functions for use elsewhere if needed
+export { updateExperimentationConsent, hasExperimentationConsent };
+```
+
+Your `scripts.js` stays clean - no consent code needed there!
+
+</details>
+
+<details>
+<summary>Integrate in scripts.js</summary>
+
+```javascript
+// scripts.js
+import {
+  updateExperimentationConsent,
+  hasExperimentationConsent,
+} from '../plugins/experimentation/src/index.js';
+
+import { runExperimentation } from './experiment-loader.js';
+
+// Setup consent (choose ONE based on your CMP)
+function setupOneTrustConsent() {
+  function handleOneTrustConsent() {
+    const activeGroups = window.OnetrustActiveGroups || '';
+    const hasConsent = activeGroups.includes('C0003') || activeGroups.includes('C0004');
+    updateExperimentationConsent(hasConsent);
+  }
+  window.OptanonWrapper = function() {
+    handleOneTrustConsent();
+  };
+}
+
+async function loadEager(doc) {
+  document.documentElement.lang = 'en';
+  decorateTemplateAndTheme();
+
+  // Initialize consent BEFORE running experiments
+  setupOneTrustConsent();
+
+  await runExperimentation(doc, experimentationConfig);
+  
+  // ... rest of your code
+}
+```
+
+</details>
+
+For detailed usage instructions and more examples, see the [Experiments documentation](/documentation/experiments.md#consent-based-experiments).
 
 #### Events
 
@@ -508,6 +655,7 @@ Here's the complete experiment config structure available in `window.hlx.experim
   variantNames: ["control", "challenger-1"],
   audiences: ["mobile", "desktop"],
   resolvedAudiences: ["mobile"],
+  requiresConsent: false, // whether this experiment requires user consent
   run: true,
   variants: {
     control: { percentageSplit: "0.5", pages: ["/current"], label: "Control" },
