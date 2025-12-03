@@ -103,11 +103,17 @@ function getConsentFromStorage() {
 
 /**
  * Writes the consent status to localStorage.
+ * Only stores consent when explicitly given (true).
+ * Removes the key when consent is denied or revoked (false).
  * @param {Boolean} consented Whether the user has consented
  */
 function setConsentInStorage(consented) {
   try {
-    localStorage.setItem(CONSENT_STORAGE_KEY, consented ? 'true' : 'false');
+    if (consented) {
+      localStorage.setItem(CONSENT_STORAGE_KEY, 'true');
+    } else {
+      localStorage.removeItem(CONSENT_STORAGE_KEY);
+    }
   } catch (error) {
     debug('Failed to save consent to localStorage:', error);
   }
@@ -123,11 +129,18 @@ export function hasExperimentationConsent() {
 
 /**
  * Sets the user consent status for experimentation.
+ * - If consent is given (true): stores the decision in localStorage
+ * - If consent is denied or revoked (false): removes any stored consent
  * @param {Boolean} consented Whether the user has consented to experimentation
  */
 export function updateExperimentationConsent(consented) {
-  setConsentInStorage(consented);
-  debug('Experimentation consent updated:', consented);
+  if (consented) {
+    setConsentInStorage(true);
+    debug('Experimentation consent granted and stored');
+  } else {
+    setConsentInStorage(false);
+    debug('Experimentation consent denied or revoked - storage cleared');
+  }
 }
 
 /**
