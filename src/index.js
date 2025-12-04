@@ -48,6 +48,8 @@ export const DEFAULT_OPTIONS = {
   decorateFunction: () => {},
 };
 
+const CONSENT_STORAGE_KEY = 'experimentation-consented';
+
 /**
  * Converts a given comma-seperate string to an array.
  * @param {String|String[]} str The string to convert
@@ -83,6 +85,61 @@ async function onPageActivation(cb) {
     document.addEventListener('prerenderingchange', cb, { once: true });
   } else {
     cb();
+  }
+}
+
+/**
+ * Reads the current consent status from localStorage.
+ * @returns {Boolean} true if consent is given, false otherwise
+ */
+function getConsentFromStorage() {
+  try {
+    return localStorage.getItem(CONSENT_STORAGE_KEY) === 'true';
+  } catch (error) {
+    debug('Failed to read consent from localStorage:', error);
+    return false;
+  }
+}
+
+/**
+ * Writes the consent status to localStorage.
+ * Only stores consent when explicitly given (true).
+ * Removes the key when consent is denied or revoked (false).
+ * @param {Boolean} consented Whether the user has consented
+ */
+function setConsentInStorage(consented) {
+  try {
+    if (consented) {
+      localStorage.setItem(CONSENT_STORAGE_KEY, 'true');
+    } else {
+      localStorage.removeItem(CONSENT_STORAGE_KEY);
+    }
+  } catch (error) {
+    debug('Failed to save consent to localStorage:', error);
+  }
+}
+
+/**
+ * Checks if user has given consent for experimentation.
+ * @returns {Boolean} true if consent is given, false otherwise
+ */
+export function isUserConsentGiven() {
+  return getConsentFromStorage();
+}
+
+/**
+ * Sets the user consent status for experimentation.
+ * - If consent is given (true): stores the decision in localStorage
+ * - If consent is denied or revoked (false): removes any stored consent
+ * @param {Boolean} consented Whether the user has consented to experimentation
+ */
+export function updateUserConsent(consented) {
+  if (consented) {
+    setConsentInStorage(true);
+    debug('Experimentation consent granted and stored');
+  } else {
+    setConsentInStorage(false);
+    debug('Experimentation consent denied or revoked - storage cleared');
   }
 }
 
@@ -684,12 +741,14 @@ async function getExperimentConfig(pluginOptions, metadata, overrides) {
 
   const startDate = metadata.startDate ? new Date(metadata.startDate) : null;
   const endDate = metadata.endDate ? new Date(metadata.endDate) : null;
+  const requiresConsent = metadata.requiresConsent === 'true';
 
   const config = {
     id,
     label: `Experiment ${metadata.value || metadata.experiment}`,
     status: metadata.status || 'active',
     audiences,
+    requiresConsent,
     endDate,
     resolvedAudiences,
     startDate,
@@ -706,6 +765,8 @@ async function getExperimentConfig(pluginOptions, metadata, overrides) {
     && (!overrides.audience || audiences.includes(overrides.audience))
     && (!startDate || startDate <= Date.now())
     && (!endDate || endDate > Date.now())
+    // experiment has consent if required
+    && (!requiresConsent || isUserConsentGiven())
   );
 
   if (!config.run) {
