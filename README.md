@@ -216,7 +216,7 @@ import {
 // Check if user has consented to experimentation
 const hasConsent = hasExperimentationConsent();
 
-// Update consent status (call this from your consent management platform)
+// Integrate this with your consent management platform events to track the user's choice
 updateExperimentationConsent(true);  // or false to revoke consent
 ```
 
