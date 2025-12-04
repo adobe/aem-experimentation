@@ -209,15 +209,15 @@ The plugin provides consent management APIs for privacy compliance. Experiments 
 
 ```javascript
 import { 
-  hasExperimentationConsent, 
-  updateExperimentationConsent 
+  isUserConsentGiven,
+  updateUserConsent
 } from './plugins/experimentation/src/index.js';
 
 // Check if user has consented to experimentation
-const hasConsent = hasExperimentationConsent();
+const hasConsent = isUserConsentGiven();
 
 // Integrate this with your consent management platform events to track the user's choice
-updateExperimentationConsent(true);  // or false to revoke consent
+updateUserConsent(true);  // or false to revoke consent
 ```
 
 **Requiring consent for an experiment:**
@@ -243,25 +243,39 @@ You can integrate consent management in two ways:
 ```javascript
 // experiment-loader.js
 import {
-  updateExperimentationConsent,
-  hasExperimentationConsent,
+  updateUserConsent,
+  isUserConsentGiven,
 } from '../plugins/experimentation/src/index.js';
 
 /**
  * Initialize consent management
- * Choose ONE of the setup functions based on your CMP
+ * Choose ONE of the setup functions based on your CMP (Consent Management Platform)
+ * 
+ * IMPORTANT: These are example implementations. Please:
+ * 1. Verify the consent categories match your OneTrust/Cookiebot configuration
+ * 2. Test thoroughly in your environment
+ * 3. Consult with your legal/privacy team about consent requirements
  */
 function initConsent() {
   // OPTION 1: OneTrust
   function setupOneTrustConsent() {
-    function handleOneTrustConsent() {
-      const activeGroups = window.OnetrustActiveGroups || '';
-      const hasConsent = activeGroups.includes('C0003') || activeGroups.includes('C0004');
-      updateExperimentationConsent(hasConsent);
-    }
+    // Step 1: Bridge OneTrust's callback to dispatch a custom event
     window.OptanonWrapper = function() {
-      handleOneTrustConsent();
+      const activeGroups = window.OnetrustActiveGroups || '';
+      const groups = activeGroups.split(',').filter(g => g);
+      window.dispatchEvent(new CustomEvent('consent.onetrust', { 
+        detail: groups 
+      }));
     };
+    
+    // Step 2: Listen for the custom event
+    function consentEventHandler(ev) {
+      const groups = ev.detail;
+      const hasConsent = groups.includes('C0003') // Functional Cookies
+        || groups.includes('C0004'); // Targeting Cookies
+      updateUserConsent(hasConsent);
+    }
+    window.addEventListener('consent.onetrust', consentEventHandler);
   }
 
   // OPTION 2: Cookiebot
@@ -269,7 +283,7 @@ function initConsent() {
     function handleCookiebotConsent() {
       const preferences = window.Cookiebot?.consent?.preferences || false;
       const marketing = window.Cookiebot?.consent?.marketing || false;
-      updateExperimentationConsent(preferences || marketing);
+      updateUserConsent(preferences || marketing);
     }
     window.addEventListener('CookiebotOnConsentReady', handleCookiebotConsent);
     window.addEventListener('CookiebotOnAccept', handleCookiebotConsent);
@@ -278,7 +292,7 @@ function initConsent() {
   // OPTION 3: Custom Consent Banner
   function setupCustomConsent() {
     document.addEventListener('consent-updated', (event) => {
-      updateExperimentationConsent(event.detail.experimentation);
+      updateUserConsent(event.detail.experimentation);
     });
   }
 
@@ -299,7 +313,7 @@ export async function runExperimentation(document, config) {
 }
 
 // Export consent functions for use elsewhere if needed
-export { updateExperimentationConsent, hasExperimentationConsent };
+export { updateUserConsent, isUserConsentGiven };
 ```
 
 Your `scripts.js` stays clean - no consent code needed there!
@@ -312,22 +326,31 @@ Your `scripts.js` stays clean - no consent code needed there!
 ```javascript
 // scripts.js
 import {
-  updateExperimentationConsent,
-  hasExperimentationConsent,
+  updateUserConsent,
+  isUserConsentGiven,
 } from '../plugins/experimentation/src/index.js';
 
 import { runExperimentation } from './experiment-loader.js';
 
 // Setup consent (choose ONE based on your CMP)
 function setupOneTrustConsent() {
-  function handleOneTrustConsent() {
-    const activeGroups = window.OnetrustActiveGroups || '';
-    const hasConsent = activeGroups.includes('C0003') || activeGroups.includes('C0004');
-    updateExperimentationConsent(hasConsent);
-  }
+  // Step 1: Bridge OneTrust's callback to dispatch a custom event
   window.OptanonWrapper = function() {
-    handleOneTrustConsent();
+    const activeGroups = window.OnetrustActiveGroups || '';
+    const groups = activeGroups.split(',').filter(g => g);
+    window.dispatchEvent(new CustomEvent('consent.onetrust', { 
+      detail: groups 
+    }));
   };
+  
+  // Step 2: Listen for the custom event
+  function consentEventHandler(ev) {
+    const groups = ev.detail;
+    const hasConsent = groups.includes('C0003') // Functional Cookies
+      || groups.includes('C0004'); // Targeting Cookies
+    updateUserConsent(hasConsent);
+  }
+  window.addEventListener('consent.onetrust', consentEventHandler);
 }
 
 async function loadEager(doc) {

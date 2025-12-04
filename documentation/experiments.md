@@ -130,7 +130,7 @@ So you can both use generic dates, like `2024-01-31` or `2024/01/31`, and time-s
 
 #### Consent-based experiments
 
-For compliance with privacy regulations like GDPR, CCPA, and others, experiments can be configured to require user consent before running. This ensures that personalization and experimentation only occurs when users have explicitly agreed to it.
+For compliance with privacy regulations like GDPR, CCPA, and others, experiments can be configured to require user consent before running. This ensures that personalization and experimentation only occur when users have explicitly agreed to it.
 
 ##### Enabling consent requirement
 
@@ -150,35 +150,35 @@ The experimentation runtime provides JavaScript APIs to manage user consent:
 
 **Check current consent status:**
 ```javascript
-import { hasExperimentationConsent } from './path/to/experimentation/src/index.js';
+import { isUserConsentGiven } from './path/to/experimentation/src/index.js';
 
-const isConsented = hasExperimentationConsent();
+const isConsented = isUserConsentGiven();
 console.log('User has consented to experimentation:', isConsented);
 ```
 
 **Update consent status:**
 ```javascript
-import { updateExperimentationConsent } from './path/to/experimentation/src/index.js';
+import { updateUserConsent } from './path/to/experimentation/src/index.js';
 
 // Update consent (call this when your CMP sends a consent event)
-updateExperimentationConsent(true);  // or false to revoke consent
+updateUserConsent(true);  // or false to revoke consent
 ```
 
 ##### Integrating with consent management platforms
 
-Connect your consent management system (CMS) to track user consent. Call `updateExperimentationConsent` when your CMS sends a consent event.
+Connect your consent management system (CMS) to track user consent. Call `updateUserConsent` when your CMS sends a consent event.
 
 > **💡 Tip**: For cleaner code organization, we recommend placing consent integration in your `experiment-loader.js` file (if you have one) rather than in `scripts.js`. This keeps all experimentation-related code together. See the [README](/README.md#consent-management) for complete implementation examples.
 
 **Example: OneTrust integration**
 ```javascript
-import { updateExperimentationConsent } from './path/to/experimentation/src/index.js';
+import { updateUserConsent } from './path/to/experimentation/src/index.js';
 
 function handleOneTrustConsent() {
   const activeGroups = window.OnetrustActiveGroups || '';
-  // C0003 = Functional/Performance, C0004 = Targeting
-  const hasConsent = activeGroups.includes('C0003') || activeGroups.includes('C0004');
-  updateExperimentationConsent(hasConsent);
+  const hasConsent = activeGroups.includes('C0003') // Functional Cookies
+    || activeGroups.includes('C0004'); // Targeting Cookies
+  updateUserConsent(hasConsent);
 }
 
 // Hook into OneTrust callback
@@ -189,12 +189,12 @@ window.OptanonWrapper = function() {
 
 **Example: Cookiebot integration**
 ```javascript
-import { updateExperimentationConsent } from './path/to/experimentation/src/index.js';
+import { updateUserConsent } from './path/to/experimentation/src/index.js';
 
 function handleCookiebotConsent() {
   const preferences = window.Cookiebot?.consent?.preferences || false;
   const marketing = window.Cookiebot?.consent?.marketing || false;
-  updateExperimentationConsent(preferences || marketing);
+  updateUserConsent(preferences || marketing);
 }
 
 window.addEventListener('CookiebotOnConsentReady', handleCookiebotConsent);
@@ -203,11 +203,11 @@ window.addEventListener('CookiebotOnAccept', handleCookiebotConsent);
 
 **Example: Custom consent banner**
 ```javascript
-import { updateExperimentationConsent } from './path/to/experimentation/src/index.js';
+import { updateUserConsent } from './path/to/experimentation/src/index.js';
 
 // When user accepts/rejects consent
 function onConsentChange(accepted) {
-  updateExperimentationConsent(accepted);
+  updateUserConsent(accepted);
 }
 ```
 

@@ -123,7 +123,7 @@ function setConsentInStorage(consented) {
  * Checks if user has given consent for experimentation.
  * @returns {Boolean} true if consent is given, false otherwise
  */
-export function hasExperimentationConsent() {
+export function isUserConsentGiven() {
   return getConsentFromStorage();
 }
 
@@ -133,7 +133,7 @@ export function hasExperimentationConsent() {
  * - If consent is denied or revoked (false): removes any stored consent
  * @param {Boolean} consented Whether the user has consented to experimentation
  */
-export function updateExperimentationConsent(consented) {
+export function updateUserConsent(consented) {
   if (consented) {
     setConsentInStorage(true);
     debug('Experimentation consent granted and stored');
@@ -766,7 +766,7 @@ async function getExperimentConfig(pluginOptions, metadata, overrides) {
     && (!startDate || startDate <= Date.now())
     && (!endDate || endDate > Date.now())
     // experiment has consent if required
-    && (!requiresConsent || hasExperimentationConsent())
+    && (!requiresConsent || isUserConsentGiven())
   );
 
   if (!config.run) {
