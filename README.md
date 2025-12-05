@@ -12,6 +12,7 @@ The AEM Experimentation plugin supports:
 - :busts_in_silhouette: serving different content variations to different audiences, including custom audience definitions for your project that can be either resolved directly in-browser or against a trusted backend API.
 - :money_with_wings: serving different content variations based on marketing campaigns you are running, so that you can easily track email and/or social campaigns
 - :chart_with_upwards_trend: running A/B test experiments on a set of variants to measure and improve the conversion on your site. This works particularly with our :chart: [RUM conversion tracking plugin](https://github.com/adobe/franklin-rum-conversion).
+- :shield: privacy-compliant experimentation with built-in consent management support for GDPR, CCPA, and other privacy regulations
 - :rocket: easy simulation of each experience and basic reporting leveraging in-page overlays
 
 ## Installation
@@ -90,46 +91,6 @@ export async function runExperimentation(document, config) {
   }
 }
 
-/**
- * Loads the experimentation module (lazy).
- * @param {Document} document The document object.
- * @param {Object} config The experimentation configuration.
- * @returns {Promise<void>} A promise that resolves when the experimentation module is loaded.
- */
-export async function showExperimentationRail(document, config) {
-  if (!isExperimentationEnabled()) {
-    return null;
-  }
-
-  try {
-    const { loadLazy } = await import(
-      '../plugins/experimentation/src/index.js'
-    );
-    await loadLazy(document, config);
-
-    const loadSidekickHandler = () => import('../tools/sidekick/aem-experimentation.js');
-
-    if (document.querySelector('helix-sidekick, aem-sidekick')) {
-      await loadSidekickHandler();
-    } else {
-      await new Promise((resolve) => {
-        document.addEventListener(
-          'sidekick-ready',
-          () => {
-            loadSidekickHandler().then(resolve);
-          },
-          { once: true },
-        );
-      });
-    }
-
-    return true;
-  } catch (error) {
-    // eslint-disable-next-line no-console
-    console.error('Failed to load experimentation module (lazy):', error);
-    return null;
-  }
-}
 ```
 
 ### Step 2: Update `scripts/scripts.js`
@@ -139,7 +100,6 @@ Add the following import and configuration at the top of your `scripts/scripts.j
 ```js
 import {
   runExperimentation,
-  showExperimentationRail,
 } from './experiment-loader.js';
 
 const experimentationConfig = {
@@ -162,16 +122,6 @@ async function loadEager(doc) {
 }
 ```
 
-Finally, add the following line at the end of your `loadLazy()` function:
-
-```js
-async function loadLazy(doc) {
-  // ... existing code ...
-  await showExperimentationRail(doc, experimentationConfig);
-}
-```
-
-### Configuration for Existing Xwalk Projects
 
 If you're adding experimentation rail UI to an existing project that already has the experimentation engine:
 
@@ -274,7 +224,7 @@ const experimentationConfig = {
 
   // the storage type used to persist data between page views
   // (for instance to remember what variant in an experiment the user was served)
-  storage: window.SessionStorage,
+  storage: window.sessionStorage,
 
   /* Audiences related properties */
   // See more details on the dedicated Audiences page linked below
@@ -316,29 +266,497 @@ Fragment replacement is handled by async observer, which may execute before or a
 
 ## Extensibility & integrations
 
-If you need to further integrate the experimentation plugin with custom analytics reporting or other 3rd-party libraries, you can listen for the `aem:experimentation` event:
-```js
-document.addEventListener('aem:experimentation', (ev) => console.log(ev.detail));
+The experimentation plugin exposes APIs that allow you to integrate with analytics platforms and other 3rd-party libraries.
+The plugin exposes experiment data through two mechanisms:
+1. **Events** - React immediately when experiments are applied (V2 only)
+2. **Global Objects** - Access complete experiment details after page load
+
+### Available APIs
+
+#### Consent Management
+
+The plugin provides consent management APIs for privacy compliance. Experiments can be configured to require user consent before running.
+
+**APIs:**
+
+```javascript
+import { 
+  isUserConsentGiven,
+  updateUserConsent
+} from './plugins/experimentation/src/index.js';
+
+// Check if user has consented to experimentation
+const hasConsent = isUserConsentGiven();
+
+// Integrate this with your consent management platform events to track the user's choice
+updateUserConsent(true);  // or false to revoke consent
+```
+
+**Requiring consent for an experiment:**
+
+Add the `Experiment Requires Consent` metadata property:
+
+| Metadata              |                                                              |
+|-----------------------|--------------------------------------------------------------|
+| Experiment            | Hero Test                                                    |
+| Experiment Variants   | /variant-1, /variant-2                                       |
+| Experiment Requires Consent | true                                                   |
+
+**Implementation:**
+
+You can integrate consent management in two ways:
+
+1. **In your `experiment-loader.js`** (recommended) - keeps all experimentation code together
+2. **In your `scripts.js`** - if you need consent for other purposes beyond experimentation
+
+<details>
+<summary>Recommended: Integrate in experiment-loader.js</summary>
+
+```javascript
+// experiment-loader.js
+import {
+  updateUserConsent,
+  isUserConsentGiven,
+} from '../plugins/experimentation/src/index.js';
+
+/**
+ * Initialize consent management
+ * Choose ONE of the setup functions based on your CMP (Consent Management Platform)
+ * 
+ * IMPORTANT: These are example implementations. Please:
+ * 1. Verify the consent categories match your OneTrust/Cookiebot configuration
+ * 2. Test thoroughly in your environment
+ * 3. Consult with your legal/privacy team about consent requirements
+ */
+function initConsent() {
+  // OPTION 1: OneTrust
+  function setupOneTrustConsent() {
+    // Step 1: Bridge OneTrust's callback to dispatch a custom event
+    window.OptanonWrapper = function() {
+      const activeGroups = window.OnetrustActiveGroups || '';
+      const groups = activeGroups.split(',').filter(g => g);
+      window.dispatchEvent(new CustomEvent('consent.onetrust', { 
+        detail: groups 
+      }));
+    };
+    
+    // Step 2: Listen for the custom event
+    function consentEventHandler(ev) {
+      const groups = ev.detail;
+      const hasConsent = groups.includes('C0003') // Functional Cookies
+        || groups.includes('C0004'); // Targeting Cookies
+      updateUserConsent(hasConsent);
+    }
+    window.addEventListener('consent.onetrust', consentEventHandler);
+  }
+
+  // OPTION 2: Cookiebot
+  function setupCookiebotConsent() {
+    function handleCookiebotConsent() {
+      const preferences = window.Cookiebot?.consent?.preferences || false;
+      const marketing = window.Cookiebot?.consent?.marketing || false;
+      updateUserConsent(preferences || marketing);
+    }
+    window.addEventListener('CookiebotOnConsentReady', handleCookiebotConsent);
+    window.addEventListener('CookiebotOnAccept', handleCookiebotConsent);
+  }
+
+  // OPTION 3: Custom Consent Banner
+  function setupCustomConsent() {
+    document.addEventListener('consent-updated', (event) => {
+      updateUserConsent(event.detail.experimentation);
+    });
+  }
+
+  // Choose ONE:
+  setupOneTrustConsent();     // or setupCookiebotConsent() or setupCustomConsent()
+}
+
+export async function runExperimentation(document, config) {
+  if (!isExperimentationEnabled()) {
+    return null;
+  }
+
+  // Initialize consent BEFORE loading experimentation
+  initConsent();
+
+  const { loadEager } = await import('../plugins/experimentation/src/index.js');
+  return loadEager(document, config);
+}
+
+// Export consent functions for use elsewhere if needed
+export { updateUserConsent, isUserConsentGiven };
+```
+
+Your `scripts.js` stays clean - no consent code needed there!
+
+</details>
+
+<details>
+<summary>Integrate in scripts.js</summary>
+
+```javascript
+// scripts.js
+import {
+  updateUserConsent,
+  isUserConsentGiven,
+} from '../plugins/experimentation/src/index.js';
+
+import { runExperimentation } from './experiment-loader.js';
+
+// Setup consent (choose ONE based on your CMP)
+function setupOneTrustConsent() {
+  // Step 1: Bridge OneTrust's callback to dispatch a custom event
+  window.OptanonWrapper = function() {
+    const activeGroups = window.OnetrustActiveGroups || '';
+    const groups = activeGroups.split(',').filter(g => g);
+    window.dispatchEvent(new CustomEvent('consent.onetrust', { 
+      detail: groups 
+    }));
+  };
+  
+  // Step 2: Listen for the custom event
+  function consentEventHandler(ev) {
+    const groups = ev.detail;
+    const hasConsent = groups.includes('C0003') // Functional Cookies
+      || groups.includes('C0004'); // Targeting Cookies
+    updateUserConsent(hasConsent);
+  }
+  window.addEventListener('consent.onetrust', consentEventHandler);
+}
+
+async function loadEager(doc) {
+  document.documentElement.lang = 'en';
+  decorateTemplateAndTheme();
+
+  // Initialize consent BEFORE running experiments
+  setupOneTrustConsent();
+
+  await runExperimentation(doc, experimentationConfig);
+  
+  // ... rest of your code
+}
+```
+
+</details>
+
+For detailed usage instructions and more examples, see the [Experiments documentation](/documentation/experiments.md#consent-based-experiments).
+
+#### Events
+
+Listen for the `aem:experimentation` event to react when experiments, campaigns, or audiences are applied:
+
+```javascript
+document.addEventListener('aem:experimentation', (event) => {
+  console.log(event.detail);
+});
 ```
 
 The event details will contain one of 3 possible sets of properties:
-- For experiments:
-  - `type`: `experiment`
-  - `element`: the DOM element that was modified
-  - `experiment`: the experiment name
-  - `variant`: the variant name that was served
-- For audiences:
-  - `type`: `audience`
-  - `element`: the DOM element that was modified
-  - `audience`: the audience that was resolved
-- For campaigns:
-  - `type`: `campaign`
-  - `element`: the DOM element that was modified
-  - `campaign`: the campaign that was resolved
 
-Additionally, you can leverage the following global JS objects `window.hlx.experiments`, `window.hlx.audiences` and `window.hlx.campaigns`.
-Those will each be an array of objects containing:
-  - `type`: one of `page`, `section` or `fragment`
-  - `el`: the DOM element that was modified
-  - `servedExperience`: the URL for the content that was inlined for that experience
-  - `config`: an object containing the config details
+- **For experiments:**
+```javascript
+{
+  type: 'experiment',
+  element: DOMElement, // the DOM element that was modified
+  experiment: 'experiment-name', // the experiment name
+  variant: 'variant-name' // the variant name that was served
+}
+```
+
+- **For campaigns:**
+```javascript
+{
+  type: 'campaign',
+  element: DOMElement, // the DOM element that was modified
+  campaign: 'campaign-name' // the campaign that was resolved
+}
+```
+
+- **For audiences:**
+```javascript
+{
+  type: 'audience',
+  element: DOMElement, // the DOM element that was modified
+  audience: 'audience-name' // the audience that was resolved
+}
+```
+
+#### Global Objects
+
+You can leverage the following global JS objects:
+
+```javascript
+// All experiments (page, section, fragment levels)  
+const allExperiments = window.hlx.experiments;
+
+// All audiences (page, section, fragment levels)
+const allAudiences = window.hlx.audiences;
+
+// All campaigns (page, section, fragment levels)
+const allCampaigns = window.hlx.campaigns;
+
+// backward compatibility with V1
+const experiment = window.hlx.experiment;
+const audience = window.hlx.audience;
+const campaign = window.hlx.campaign;
+```
+
+- **Array Structure:**
+
+`window.hlx.experiments`, `window.hlx.audiences`, and `window.hlx.campaigns` are each an array of objects containing:
+
+```javascript
+[
+  {
+    type: 'page', // one of: page, section, fragment
+    el: DOMElement, // the DOM element that was modified
+    servedExperience: '/variant-url', // the URL for the content that was inlined (if any)
+    config: { /* see Complete Reference section below */ }
+  }
+  // ... more objects for section/fragment level modifications
+]
+```
+
+### Integration Examples
+
+#### Adobe Analytics, Target & AJO Integration
+
+For Adobe Analytics, Target, and Adobe Journey Optimizer integration:
+
+- **Event-driven approach:**
+```javascript
+document.addEventListener('aem:experimentation', (event) => {
+  if (event.detail.type === 'experiment') {
+    const { experiment, variant } = event.detail;
+    
+    // Choose your Adobe integration method below
+  }
+});
+```
+
+<details>
+<summary>Option 1: Adobe Client Data Layer (works with all Adobe products via Tags)</summary>
+
+```javascript
+document.addEventListener('aem:experimentation', (event) => {
+  if (event.detail.type === 'experiment') {
+    const { experiment, variant } = event.detail;
+    
+    window.adobeDataLayer = window.adobeDataLayer || [];
+    window.adobeDataLayer.push({
+      event: 'experiment-applied',
+      experiment: {
+        id: experiment,
+        variant: variant
+      }
+    });
+  }
+});
+```
+
+</details>
+
+<details>
+<summary>Option 2: Web SDK with XDM (direct AEP + Analytics integration)</summary>
+
+```javascript
+document.addEventListener('aem:experimentation', (event) => {
+  if (event.detail.type === 'experiment') {
+    const { experiment, variant } = event.detail;
+    
+    if (window.alloy) {
+      alloy("sendEvent", {
+        xdm: {
+          eventType: "decisioning.propositionDisplay",
+          timestamp: new Date().toISOString(),
+          _experience: {
+            decisioning: {
+              propositions: [{
+                id: experiment,
+                scope: "page",
+                items: [{
+                  id: variant,
+                  schema: "https://ns.adobe.com/personalization/default-content-item"
+                }]
+              }],
+              propositionEventType: {
+                display: 1
+              }
+            }
+          }
+        },
+        data: {
+          __adobe: {
+            analytics: {
+              eVar1: experiment,
+              eVar2: variant,
+              events: "event1"
+            }
+          }
+        }
+      });
+    }
+  }
+});
+```
+
+</details>
+
+- **Global object approach:**
+```javascript
+if (window.hlx.experiment) {
+  const { id, selectedVariant } = window.hlx.experiment;
+  
+  // Choose your Adobe integration method below
+}
+```
+
+<details>
+<summary>Option 1: Adobe Client Data Layer (works with all Adobe products via Tags)</summary>
+
+```javascript
+if (window.hlx.experiment) {
+  const { id, selectedVariant } = window.hlx.experiment;
+  
+  window.adobeDataLayer = window.adobeDataLayer || [];
+  window.adobeDataLayer.push({
+    event: 'experiment-applied',
+    experiment: {
+      id: id,
+      variant: selectedVariant
+    }
+  });
+}
+```
+
+</details>
+
+<details>
+<summary>Option 2: Web SDK with XDM (direct AEP + Analytics integration)</summary>
+
+```javascript
+if (window.hlx.experiment) {
+  const { id, selectedVariant } = window.hlx.experiment;
+  
+  if (window.alloy) {
+    alloy("sendEvent", {
+      xdm: {
+        eventType: "decisioning.propositionDisplay",
+        timestamp: new Date().toISOString(),
+        _experience: {
+          decisioning: {
+            propositions: [{
+              id: id,
+              scope: "page",
+              items: [{
+                id: selectedVariant,
+                schema: "https://ns.adobe.com/personalization/default-content-item"
+              }]
+            }],
+            propositionEventType: {
+              display: 1
+            }
+          }
+        }
+      },
+      data: {
+        __adobe: {
+          analytics: {
+            eVar1: id,
+            eVar2: selectedVariant,
+            events: "event1"
+          }
+        }
+      }
+    });
+  }
+}
+```
+
+</details>
+
+#### Google Tag Manager / Google Analytics
+
+- **Event-driven integration (recommended):**
+```javascript
+document.addEventListener('aem:experimentation', (event) => {
+  if (event.detail.type === 'experiment') {
+    const { experiment, variant } = event.detail;
+    
+    window.dataLayer = window.dataLayer || [];
+    window.dataLayer.push({
+      event: 'experiment_view',
+      experiment_id: experiment,
+      experiment_variant: variant
+    });
+  }
+});
+```
+
+- **Global object access:**
+```javascript
+if (window.hlx.experiment) {
+  window.dataLayer = window.dataLayer || [];
+  window.dataLayer.push({
+    event: 'experiment_view',
+    experiment_id: window.hlx.experiment.id,
+    experiment_variant: window.hlx.experiment.selectedVariant
+  });
+}
+```
+
+#### Tealium
+
+- **Event-driven integration (recommended):**
+```javascript
+document.addEventListener('aem:experimentation', (event) => {
+  if (event.detail.type === 'experiment') {
+    const { experiment, variant } = event.detail;
+    
+    window.utag_data = window.utag_data || {};
+    window.utag_data.cms_experiment = `${experiment}:${variant}`;
+  }
+});
+```
+
+- **Global object access:**
+```javascript
+// Example from UPS implementation
+if (window.hlx.experiment) {
+  window.utag_data = window.utag_data || {};
+  window.utag_data.cms_experiment = `${window.hlx.experiment.id}:${window.hlx.experiment.selectedVariant}`;
+}
+```
+
+### Implementation Notes
+
+- **Customer responsibility**: You implement the analytics integration in your project code
+- **Runtime only**: Data is available at runtime - no backend integration provided  
+- **Project-specific**: Integration depends on your analytics setup and project structure
+- **Existing analytics required**: Your analytics platform must already be implemented
+
+### Complete Reference
+
+#### Experiment Config Structure
+
+Here's the complete experiment config structure available in `window.hlx.experiment`:
+
+```javascript
+{
+  id: "experiment-name",
+  selectedVariant: "challenger-1", 
+  status: "active",
+  variantNames: ["control", "challenger-1"],
+  audiences: ["mobile", "desktop"],
+  resolvedAudiences: ["mobile"],
+  requiresConsent: false, // whether this experiment requires user consent
+  run: true,
+  variants: {
+    control: { percentageSplit: "0.5", pages: ["/current"], label: "Control" },
+    "challenger-1": { percentageSplit: "0.5", pages: ["/variant"], label: "Challenger 1" }
+  }
+}
+```
+
+> **Note**: For analytics integration, you typically only need `id` and `selectedVariant`. The full config structure above is available if you need detailed experiment settings for custom logic.
