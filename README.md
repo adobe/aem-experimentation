@@ -33,14 +33,6 @@ If you prefer using `https` links you'd replace `git@github.com:adobe/aem-experi
 
 ## Project instrumentation
 
-### Starting from Boilerplate for Xwalk
-
-If you are starting from scratch, use the following template repository:
-https://github.com/adobe-rnd/aem-boilerplate-xwalk
-
-For reference, check this example project:
-https://github.com/sudo-buddy/ue-experimentation
-
 ### Key Files to Add or Modify
 
 1. **plugins/experimentation** - Add this folder containing the experimentation engine plugins (see Installation section above)
