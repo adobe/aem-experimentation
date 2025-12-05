@@ -4,7 +4,7 @@ The AEM Experimentation plugin helps you quickly set up experimentation and segm
 It is currently available to customers in collaboration with AEM Engineering via co-innovation VIP Projects. 
 To implement experimentation or personalization use-cases, please reach out to the AEM Engineering team in the Slack channel dedicated to your project.
 
-> **Note:** We are adding new support for the contextual experimentation rail UI. This is still under development. The instrumentation flow will be simplified once finalized. Feel free to reach out if you have any questions about experimentation or the contextual experimentation rail in the Slack channel **#contextual-exp-team**.
+> **Note:** We are adding new support for the contextual experimentation rail UI. This is still under development. Feel free to reach out if you have any questions via email: aem-contextual-experimentation@adobe.com.
 
 ## Features
 
@@ -20,13 +20,13 @@ The AEM Experimentation plugin supports:
 Add the plugin to your AEM project by running:
 
 ```sh
-git subtree add --squash --prefix plugins/experimentation git@github.com:adobe/aem-experimentation.git v2-ui
+git subtree add --squash --prefix plugins/experimentation git@github.com:adobe/aem-experimentation.git v2
 ```
 
 If you later want to pull the latest changes and update your local copy of the plugin:
 
 ```sh
-git subtree pull --squash --prefix plugins/experimentation git@github.com:adobe/aem-experimentation.git v2-ui
+git subtree pull --squash --prefix plugins/experimentation git@github.com:adobe/aem-experimentation.git v2
 ```
 
 If you prefer using `https` links you'd replace `git@github.com:adobe/aem-experimentation.git` in the above commands by `https://github.com/adobe/aem-experimentation.git`.
@@ -121,66 +121,6 @@ async function loadEager(doc) {
   // ... rest of your code ...
 }
 ```
-
-
-If you're adding experimentation rail UI to an existing project that already has the experimentation engine:
-
-1. **Update the engine with UI support** by running:
-   ```sh
-   git subtree pull --squash --prefix plugins/experimentation git@github.com:adobe/aem-experimentation.git v2-ui
-   ```
-
-2. **Verify the communication layer** is set up in `plugins/experimentation/src/index.js`. The `loadEager` function should include the `setupCommunicationLayer` call:
-
-```js
-export async function loadEager(document, options = {}) {
-  const pluginOptions = { ...DEFAULT_OPTIONS, ...options };
-  setDebugMode(window.location, pluginOptions);
-
-  const ns = window.aem || window.hlx || {};
-  ns.audiences = await serveAudience(document, pluginOptions);
-  ns.experiments = await runExperiment(document, pluginOptions);
-  ns.campaigns = await runCampaign(document, pluginOptions);
-
-  // Backward compatibility
-  ns.experiment = ns.experiments.find((e) => e.type === 'page');
-  ns.audience = ns.audiences.find((e) => e.type === 'page');
-  ns.campaign = ns.campaigns.find((e) => e.type === 'page');
-
-  if (isDebugEnabled) {
-    setupCommunicationLayer(pluginOptions);
-  }
-}
-
-// Support new Rail UI communication
-function setupCommunicationLayer(options) {
-  window.addEventListener('message', async (event) => {
-    if (event.data?.type === 'hlx:experimentation-get-config') {
-      try {
-        const safeClone = JSON.parse(JSON.stringify(window.hlx));
-
-        if (options.prodHost) {
-          safeClone.prodHost = options.prodHost;
-        }
-
-        event.source.postMessage(
-          {
-            type: 'hlx:experimentation-config',
-            config: safeClone,
-            source: 'index-js',
-          },
-          '*',
-        );
-      } catch (e) {
-        // eslint-disable-next-line no-console
-        console.error('Error sending hlx config:', e);
-      }
-    }
-  });
-}
-```
-
-3. **Follow Steps 1 and 2 above** to create the `experiment-loader.js` file and update your `scripts.js`.
 
 ### Increasing sampling rate for low traffic pages
 
