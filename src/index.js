@@ -1038,25 +1038,6 @@ async function serveAudience(document, pluginOptions) {
   );
 }
 
-export async function loadEager(document, options = {}) {
-  const pluginOptions = { ...DEFAULT_OPTIONS, ...options };
-  setDebugMode(window.location, pluginOptions);
-
-  const ns = window.aem || window.hlx || {};
-  ns.audiences = await serveAudience(document, pluginOptions);
-  ns.experiments = await runExperiment(document, pluginOptions);
-  ns.campaigns = await runCampaign(document, pluginOptions);
-
-  // Backward compatibility
-  ns.experiment = ns.experiments.find((e) => e.type === 'page');
-  ns.audience = ns.audiences.find((e) => e.type === 'page');
-  ns.campaign = ns.campaigns.find((e) => e.type === 'page');
-
-  if (isDebugEnabled) {
-    setupCommunicationLayer(pluginOptions);
-  }
-}
-
 // Support new Rail UI communication
 function setupCommunicationLayer(options) {
   window.addEventListener('message', async (event) => {
@@ -1114,9 +1095,25 @@ function setupCommunicationLayer(options) {
   });
 }
 
-export async function loadLazy(document, options = {}) {
-  // do not show the experimentation pill on prod domains
-  if (!isDebugEnabled) {
-    return;
+export async function loadEager(document, options = {}) {
+  const pluginOptions = { ...DEFAULT_OPTIONS, ...options };
+  setDebugMode(window.location, pluginOptions);
+
+  const ns = window.aem || window.hlx || {};
+  ns.audiences = await serveAudience(document, pluginOptions);
+  ns.experiments = await runExperiment(document, pluginOptions);
+  ns.campaigns = await runCampaign(document, pluginOptions);
+
+  // Backward compatibility
+  ns.experiment = ns.experiments.find((e) => e.type === 'page');
+  ns.audience = ns.audiences.find((e) => e.type === 'page');
+  ns.campaign = ns.campaigns.find((e) => e.type === 'page');
+
+  if (isDebugEnabled) {
+    setupCommunicationLayer(pluginOptions);
   }
+}
+
+export async function loadLazy() {
+  // Placeholder for lazy loading functionality
 }
