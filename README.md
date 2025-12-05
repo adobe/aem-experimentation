@@ -149,7 +149,7 @@ You have already seen the `audiences` option in the examples above, but here is 
 const experimentationConfig = {
   // Lets you configure the prod environment.
   // (prod environments do not get the pill overlay)
-  prodHost: 'www.my-website.com',
+  prodHost: 'www.mysite.com',
   // if you have several, or need more complex logic to toggle pill overlay, you can use
   isProd: () => !window.location.hostname.endsWith('hlx.page')
     && window.location.hostname !== ('localhost'),
