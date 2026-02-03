@@ -85,6 +85,11 @@ export async function runExperimentation(document, config) {
 
 ```
 
+> **Note:** Add the following line to your `head.html` to preload the experiment loader script:
+> ```html
+> <link rel="modulepreload" href="/scripts/experiment-loader.js" />
+> ```
+
 ### Step 2: Update `scripts/scripts.js`
 
 Add the following import and configuration at the top of your `scripts/scripts.js`:
