@@ -29,6 +29,8 @@ export function debug(...args) {
   }
 }
 
+export const VERSION = '1.0.1';
+
 export const DEFAULT_OPTIONS = {
 
   // Audiences related properties
@@ -1100,6 +1102,7 @@ export async function loadEager(document, options = {}) {
   setDebugMode(window.location, pluginOptions);
 
   const ns = window.aem || window.hlx || {};
+  ns.experimentation = { version: VERSION };
   ns.audiences = await serveAudience(document, pluginOptions);
   ns.experiments = await runExperiment(document, pluginOptions);
   ns.campaigns = await runCampaign(document, pluginOptions);
