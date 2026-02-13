@@ -20,13 +20,13 @@ The AEM Experimentation plugin supports:
 Add the plugin to your AEM project by running:
 
 ```sh
-git subtree add --squash --prefix plugins/experimentation git@github.com:adobe/aem-experimentation.git v2
+git subtree add --squash --prefix plugins/experimentation git@github.com:adobe/aem-experimentation.git v2-ui
 ```
 
 If you later want to pull the latest changes and update your local copy of the plugin:
 
 ```sh
-git subtree pull --squash --prefix plugins/experimentation git@github.com:adobe/aem-experimentation.git v2
+git subtree pull --squash --prefix plugins/experimentation git@github.com:adobe/aem-experimentation.git v2-ui
 ```
 
 If you prefer using `https` links you'd replace `git@github.com:adobe/aem-experimentation.git` in the above commands by `https://github.com/adobe/aem-experimentation.git`.
