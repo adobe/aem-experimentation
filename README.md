@@ -20,13 +20,13 @@ The AEM Experimentation plugin supports:
 Add the plugin to your AEM project by running:
 
 ```sh
-git subtree add --squash --prefix plugins/experimentation git@github.com:adobe/aem-experimentation.git v2-ui
+git subtree add --squash --prefix plugins/experimentation git@github.com:adobe/aem-experimentation.git v2
 ```
 
 If you later want to pull the latest changes and update your local copy of the plugin:
 
 ```sh
-git subtree pull --squash --prefix plugins/experimentation git@github.com:adobe/aem-experimentation.git v2-ui
+git subtree pull --squash --prefix plugins/experimentation git@github.com:adobe/aem-experimentation.git v2
 ```
 
 If you prefer using `https` links you'd replace `git@github.com:adobe/aem-experimentation.git` in the above commands by `https://github.com/adobe/aem-experimentation.git`.
@@ -687,7 +687,7 @@ Here's the complete experiment config structure available in `window.hlx.experim
   variantNames: ["control", "challenger-1"],
   audiences: ["mobile", "desktop"],
   resolvedAudiences: ["mobile"],
-  requiresConsent: false, // whether this experiment requires user consent
+  requiresConsent: true, // whether this experiment requires user consent
   run: true,
   variants: {
     control: { percentageSplit: "0.5", pages: ["/current"], label: "Control" },
