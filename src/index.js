@@ -29,6 +29,8 @@ export function debug(...args) {
   }
 }
 
+export const VERSION = '1.0.1';
+
 export const DEFAULT_OPTIONS = {
 
   // Audiences related properties
@@ -696,13 +698,33 @@ async function getExperimentConfig(pluginOptions, metadata, overrides) {
     return null;
   }
 
+  const thumbnailMeta = document.querySelector('meta[property="og:image:secure_url"]')
+  || document.querySelector('meta[property="og:image"]');
+  const thumbnail = thumbnailMeta ? thumbnailMeta.getAttribute('content') : '';
+
   const audiences = stringToArray(metadata.audiences).map(toClassName);
 
   const splits = metadata.split
-    // custom split
-    ? stringToArray(metadata.split).map((i) => parseFloat(i) / 100)
-    // even split
-    : [...new Array(pages.length)].map(() => 1 / (pages.length + 1));
+    ? (() => {
+      const splitValues = stringToArray(metadata.split).map(
+        (i) => parseFloat(i) / 100,
+      );
+
+      // If fewer splits than pages, pad with zeros
+      if (splitValues.length < pages.length) {
+        return [
+          ...splitValues,
+          ...Array(pages.length - splitValues.length).fill(0),
+        ];
+      }
+
+      // If more splits than needed, truncate
+      if (splitValues.length > pages.length) {
+        return splitValues.slice(0, pages.length);
+      }
+
+      return splitValues;
+    })() : [...new Array(pages.length)].map(() => 1 / (pages.length + 1));
 
   const variantNames = [];
   variantNames.push('control');
@@ -745,15 +767,17 @@ async function getExperimentConfig(pluginOptions, metadata, overrides) {
 
   const config = {
     id,
-    label: `Experiment ${metadata.value || metadata.experiment}`,
+    label: metadata.label || `Experiment ${metadata.value || metadata.experiment}`,
     status: metadata.status || 'active',
     audiences,
     requiresConsent,
     endDate,
+    optimizingTarget: metadata.optimizingTarget || 'conversion',
     resolvedAudiences,
     startDate,
     variants,
     variantNames,
+    thumbnail,
   };
 
   config.run = (
@@ -1016,11 +1040,69 @@ async function serveAudience(document, pluginOptions) {
   );
 }
 
+// Support new Rail UI communication
+function setupCommunicationLayer(options) {
+  window.addEventListener('message', async (event) => {
+    if (event.data && event.data.type === 'hlx:last-modified-request') {
+      const { url } = event.data;
+
+      try {
+        const response = await fetch(url, {
+          method: 'HEAD',
+          cache: 'no-store',
+          headers: {
+            'Cache-Control': 'no-cache',
+          },
+        });
+
+        const lastModified = response.headers.get('Last-Modified');
+
+        event.source.postMessage(
+          {
+            type: 'hlx:last-modified-response',
+            url,
+            lastModified,
+            status: response.status,
+          },
+          event.origin,
+        );
+      } catch (error) {
+        // eslint-disable-next-line no-console
+        console.error('Error fetching Last-Modified header:', error);
+      }
+    } else if (event.data?.type === 'hlx:experimentation-get-config') {
+      try {
+        const safeClone = JSON.parse(JSON.stringify(window.hlx));
+        if (options.prodHost) {
+          safeClone.prodHost = options.prodHost;
+        }
+        event.source.postMessage(
+          {
+            type: 'hlx:experimentation-config',
+            config: safeClone,
+            source: 'index-js',
+          },
+          '*',
+        );
+      } catch (e) {
+        // eslint-disable-next-line no-console
+        console.error('Error sending hlx config:', e);
+      }
+    } else if (
+      event.data?.type === 'hlx:experimentation-window-reload'
+      && event.data?.action === 'reload'
+    ) {
+      window.location.reload();
+    }
+  });
+}
+
 export async function loadEager(document, options = {}) {
   const pluginOptions = { ...DEFAULT_OPTIONS, ...options };
   setDebugMode(window.location, pluginOptions);
 
   const ns = window.aem || window.hlx || {};
+  ns.experimentation = { version: VERSION };
   ns.audiences = await serveAudience(document, pluginOptions);
   ns.experiments = await runExperiment(document, pluginOptions);
   ns.campaigns = await runCampaign(document, pluginOptions);
@@ -1029,20 +1111,12 @@ export async function loadEager(document, options = {}) {
   ns.experiment = ns.experiments.find((e) => e.type === 'page');
   ns.audience = ns.audiences.find((e) => e.type === 'page');
   ns.campaign = ns.campaigns.find((e) => e.type === 'page');
+
+  if (isDebugEnabled) {
+    setupCommunicationLayer(pluginOptions);
+  }
 }
 
-export async function loadLazy(document, options = {}) {
-  const pluginOptions = { ...DEFAULT_OPTIONS, ...options };
-  // do not show the experimentation pill on prod domains
-  if (!isDebugEnabled) {
-    return;
-  }
-  // eslint-disable-next-line import/no-unresolved
-  const preview = await import('https://opensource.adobe.com/aem-experimentation/preview.js');
-  const context = {
-    getMetadata,
-    toClassName,
-    debug,
-  };
-  preview.default.call(context, document, pluginOptions);
+export async function loadLazy() {
+  // Placeholder for lazy loading functionality
 }

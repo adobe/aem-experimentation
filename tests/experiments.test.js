@@ -354,3 +354,99 @@ test.describe('Backward Compatibility with v1', () => {
     expect(await page.locator('main').textContent()).toEqual('Hello v1!');
   });
 });
+
+test.describe('Consent Management', () => {
+  test('isUserConsentGiven returns false by default', async ({ page }) => {
+    await goToAndRunExperiment(page, '/tests/fixtures/experiments/page-level');
+    const hasConsent = await page.evaluate(() => localStorage.getItem('experimentation-consented') === 'true');
+    expect(hasConsent).toBe(false);
+  });
+
+  test('updateUserConsent stores consent in localStorage', async ({ page }) => {
+    await goToAndRunExperiment(page, '/tests/fixtures/experiments/page-level');
+    await page.evaluate(() => localStorage.setItem('experimentation-consented', 'true'));
+    const stored = await page.evaluate(() => localStorage.getItem('experimentation-consented'));
+    expect(stored).toBe('true');
+  });
+
+  test('updateUserConsent removes consent from localStorage when false', async ({ page }) => {
+    await goToAndRunExperiment(page, '/tests/fixtures/experiments/page-level');
+    await page.evaluate(() => {
+      localStorage.setItem('experimentation-consented', 'true');
+      localStorage.removeItem('experimentation-consented');
+    });
+    const stored = await page.evaluate(() => localStorage.getItem('experimentation-consented'));
+    expect(stored).toBeNull();
+  });
+
+  test('isUserConsentGiven returns true after consent is granted', async ({ page }) => {
+    await goToAndRunExperiment(page, '/tests/fixtures/experiments/page-level');
+    const hasConsent = await page.evaluate(() => {
+      localStorage.setItem('experimentation-consented', 'true');
+      return localStorage.getItem('experimentation-consented') === 'true';
+    });
+    expect(hasConsent).toBe(true);
+  });
+
+  test('consent persists across page reloads', async ({ page }) => {
+    await goToAndRunExperiment(page, '/tests/fixtures/experiments/page-level');
+    await page.evaluate(() => localStorage.setItem('experimentation-consented', 'true'));
+    await page.reload();
+    await goToAndRunExperiment(page, '/tests/fixtures/experiments/page-level');
+    const hasConsent = await page.evaluate(() => localStorage.getItem('experimentation-consented') === 'true');
+    expect(hasConsent).toBe(true);
+  });
+
+  test('experiment does not run when consent is required but not given', async ({ page }) => {
+    await goToAndRunExperiment(page, '/tests/fixtures/experiments/page-level--requires-consent');
+    expect(await page.locator('main').textContent()).toEqual('Hello World!');
+  });
+
+  test('experiment runs when consent is required and given', async ({ page }) => {
+    await page.addInitScript(() => {
+      localStorage.setItem('experimentation-consented', 'true');
+    });
+    await goToAndRunExperiment(page, '/tests/fixtures/experiments/page-level--requires-consent?experiment=foo/challenger-1');
+    expect(await page.locator('main').textContent()).toEqual('Hello v1!');
+  });
+
+  test('experiment config includes requiresConsent flag', async ({ page }) => {
+    await goToAndRunExperiment(page, '/tests/fixtures/experiments/page-level--requires-consent');
+    const config = await page.evaluate(() => window.hlx.experiments?.[0]?.config);
+    expect(config?.requiresConsent).toBe(true);
+  });
+
+  test('experiments without requiresConsent metadata run normally', async ({ page }) => {
+    await goToAndRunExperiment(page, '/tests/fixtures/experiments/page-level?experiment=foo/challenger-1');
+    expect(await page.locator('main').textContent()).toEqual('Hello v1!');
+    const config = await page.evaluate(() => window.hlx.experiments?.[0]?.config);
+    expect(config?.requiresConsent).toBe(false);
+  });
+});
+
+test.describe('Experiment Configuration', () => {
+  test('experiment config includes thumbnail from og:image', async ({ page }) => {
+    await goToAndRunExperiment(page, '/tests/fixtures/experiments/page-level');
+    const config = await page.evaluate(() => window.hlx.experiments?.[0]?.config);
+    expect(config).toHaveProperty('thumbnail');
+  });
+
+  test('experiment config includes optimizingTarget', async ({ page }) => {
+    await goToAndRunExperiment(page, '/tests/fixtures/experiments/page-level');
+    const config = await page.evaluate(() => window.hlx.experiments?.[0]?.config);
+    expect(config.optimizingTarget).toBe('conversion');
+  });
+
+  test('experiment config includes label', async ({ page }) => {
+    await goToAndRunExperiment(page, '/tests/fixtures/experiments/page-level');
+    const config = await page.evaluate(() => window.hlx.experiments?.[0]?.config);
+    expect(config.label).toMatch(/Experiment foo/);
+  });
+
+  test('variant labels use custom names when provided', async ({ page }) => {
+    await goToAndRunExperiment(page, '/tests/fixtures/experiments/page-level');
+    const config = await page.evaluate(() => window.hlx.experiments?.[0]?.config);
+    expect(config.variants['challenger-1'].label).toBe('V1');
+    expect(config.variants['challenger-2'].label).toBe('V2');
+  });
+});

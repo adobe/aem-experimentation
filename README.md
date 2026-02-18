@@ -4,6 +4,8 @@ The AEM Experimentation plugin helps you quickly set up experimentation and segm
 It is currently available to customers in collaboration with AEM Engineering via co-innovation VIP Projects. 
 To implement experimentation or personalization use-cases, please reach out to the AEM Engineering team in the Slack channel dedicated to your project.
 
+> **Note:** We are adding new support for the contextual experimentation rail UI. This is still under development. Feel free to reach out if you have any questions via email: aem-contextual-experimentation@adobe.com.
+
 ## Features
 
 The AEM Experimentation plugin supports:
@@ -16,11 +18,13 @@ The AEM Experimentation plugin supports:
 ## Installation
 
 Add the plugin to your AEM project by running:
+
 ```sh
 git subtree add --squash --prefix plugins/experimentation git@github.com:adobe/aem-experimentation.git v2
 ```
 
-If you later want to pull the latest changes and update your local copy of the plugin
+If you later want to pull the latest changes and update your local copy of the plugin:
+
 ```sh
 git subtree pull --squash --prefix plugins/experimentation git@github.com:adobe/aem-experimentation.git v2
 ```
@@ -29,85 +33,90 @@ If you prefer using `https` links you'd replace `git@github.com:adobe/aem-experi
 
 ## Project instrumentation
 
-### On top of a regular boilerplate project
+### Key Files to Add or Modify
 
-Typically, you'd know you don't have the plugin system if you don't see a reference to `window.aem.plugins` or `window.hlx.plugins` in your `scripts.js`. In that case, you can still manually instrument this plugin in your project by falling back to a more manual instrumentation. To properly connect and configure the plugin for your project, you'll need to edit your `scripts.js` in your AEM project and add the following:
+1. **plugins/experimentation** - Add this folder containing the experimentation engine plugins (see Installation section above)
+2. **scripts/experiment-loader.js** - Add this script to handle experiment loading
+3. **scripts/scripts.js** - Modify this script with the configuration
 
-1. at the start of the file:
-    ```js
-    const experimentationConfig = {
-      prodHost: 'www.my-site.com',
-      audiences: {
-        mobile: () => window.innerWidth < 600,
-        desktop: () => window.innerWidth >= 600,
-        // define your custom audiences here as needed
-      }
-    };
+### Step 1: Create `scripts/experiment-loader.js`
 
-    let runExperimentation;
-    let showExperimentationOverlay;
-    const isExperimentationEnabled = document.head.querySelector('[name^="experiment"],[name^="campaign-"],[name^="audience-"],[property^="campaign:"],[property^="audience:"]')
-        || [...document.querySelectorAll('.section-metadata div')].some((d) => d.textContent.match(/Experiment|Campaign|Audience/i));
-    if (isExperimentationEnabled) {
-      ({
-        loadEager: runExperimentation,
-        loadLazy: showExperimentationOverlay,
-      } = await import('../plugins/experimentation/src/index.js'));
-    }
-    ```
-2. Early in the `loadEager` method you'll need to add:
-    ```js
-    async function loadEager(doc) {
-      …
-      // Add below snippet early in the eager phase
-      if (runExperimentation) {
-        await runExperimentation(document, experimentationConfig);
-      }
-      …
-    }
-    ```
-    This needs to be done as early as possible since this will be blocking the eager phase and impacting your LCP, so we want this to execute as soon as possible.
-3. Finally at the end of the `loadLazy` method you'll have to add:
-    ```js
-    async function loadLazy(doc) {
-      …
-      // Add below snippet at the end of the lazy phase
-      if (showExperimentationOverlay) {
-        await showExperimentationOverlay(document, experimentationConfig);
-      }
-    }
-    ```
-    This is mostly used for the authoring overlay, and as such isn't essential to the page rendering, so having it at the end of the lazy phase is good enough.
+Create a new file `scripts/experiment-loader.js` with the following content:
 
-### On top of the plugin system (deprecated)
-
-The easiest way to add the plugin is if your project is set up with the plugin system extension in the boilerplate.
-You'll know you have it if either `window.aem.plugins` or `window.hlx.plugins` is defined on your page.
-
-If you don't have it, you can follow the proposal in https://github.com/adobe/aem-lib/pull/23 and https://github.com/adobe/aem-boilerplate/pull/275 and apply the changes to your `aem.js`/`lib-franklin.js` and `scripts.js`.
-
-Once you have confirmed this, you'll need to edit your `scripts.js` in your AEM project and add the following at the start of the file:
 ```js
+/**
+ * Checks if experimentation is enabled.
+ * @returns {boolean} True if experimentation is enabled, false otherwise.
+ */
+const isExperimentationEnabled = () => document.head.querySelector('[name^="experiment"],[name^="campaign-"],[name^="audience-"],[property^="campaign:"],[property^="audience:"]')
+  || [...document.querySelectorAll('.section-metadata div')].some((d) => d.textContent.match(/Experiment|Campaign|Audience/i));
+
+/**
+ * Loads the experimentation module (eager).
+ * @param {Document} document The document object.
+ * @param {Object} config The experimentation configuration.
+ * @returns {Promise<void>} A promise that resolves when the experimentation module is loaded.
+ */
+export async function runExperimentation(document, config) {
+  if (!isExperimentationEnabled()) {
+    window.addEventListener('message', async (event) => {
+      if (event.data?.type === 'hlx:experimentation-get-config') {
+        event.source.postMessage({
+          type: 'hlx:experimentation-config',
+          config: { experiments: [], audiences: [], campaigns: [] },
+          source: 'no-experiments'
+        }, '*');
+      }
+    });
+    return null;
+  }
+
+  try {
+    const { loadEager } = await import(
+      '../plugins/experimentation/src/index.js'
+    );
+    return loadEager(document, config);
+  } catch (error) {
+    // eslint-disable-next-line no-console
+    console.error('Failed to load experimentation module (eager):', error);
+    return null;
+  }
+}
+
+```
+
+> **Note:** Add the following line to your `head.html` to preload the experiment loader script:
+> ```html
+> <link rel="modulepreload" href="/scripts/experiment-loader.js" />
+> ```
+
+### Step 2: Update `scripts/scripts.js`
+
+Add the following import and configuration at the top of your `scripts/scripts.js`:
+
+```js
+import {
+  runExperimentation,
+} from './experiment-loader.js';
+
 const experimentationConfig = {
-  prodHost: 'www.my-site.com',
+  prodHost: 'www.mysite.com', // add your prodHost here, otherwise we will show mock data
   audiences: {
     mobile: () => window.innerWidth < 600,
     desktop: () => window.innerWidth >= 600,
     // define your custom audiences here as needed
-  }
+  },
 };
+```
 
-window.aem.plugins.add('experimentation', { // use window.hlx instead of your project has this
-  condition: () =>
-    // page level metadata
-    document.head.querySelector('[name^="experiment"],[name^="campaign-"],[name^="audience-"]')
-    // decorated section metadata
-    || document.querySelector('.section[class*=experiment],.section[class*=audience],.section[class*=campaign]')
-    // undecorated section metadata
-    || [...document.querySelectorAll('.section-metadata div')].some((d) => d.textContent.match(/Experiment|Campaign|Audience/i)),
-  options: experimentationConfig,
-  url: '/plugins/experimentation/src/index.js',
-});
+Then, add the following line early in your `loadEager()` function:
+
+```js
+async function loadEager(doc) {
+  // ... existing code ...
+  await runExperimentation(doc, experimentationConfig);
+  // ... rest of your code ...
+}
 ```
 
 ### Increasing sampling rate for low traffic pages
@@ -138,14 +147,14 @@ If this is not present, please apply the following changes to the file: https://
 
 ### Custom options
 
-There are various aspects of the plugin that you can configure via options you are passing to the 2 main methods above (`runEager`/`runLazy`).
+There are various aspects of the plugin that you can configure via the `experimentationConfig` object.
 You have already seen the `audiences` option in the examples above, but here is the full list we support:
 
 ```js
-runEager.call(document, {
+const experimentationConfig = {
   // Lets you configure the prod environment.
   // (prod environments do not get the pill overlay)
-  prodHost: 'www.my-website.com',
+  prodHost: 'www.mysite.com',
   // if you have several, or need more complex logic to toggle pill overlay, you can use
   isProd: () => !window.location.hostname.endsWith('hlx.page')
     && window.location.hostname !== ('localhost'),
@@ -177,7 +186,7 @@ runEager.call(document, {
     buildBlock(el);
     decorateBlock(el);
   }
-});
+};
 ```
 
 For detailed implementation instructions on the different features, please read the dedicated pages we have on those topics:
@@ -678,7 +687,7 @@ Here's the complete experiment config structure available in `window.hlx.experim
   variantNames: ["control", "challenger-1"],
   audiences: ["mobile", "desktop"],
   resolvedAudiences: ["mobile"],
-  requiresConsent: false, // whether this experiment requires user consent
+  requiresConsent: true, // whether this experiment requires user consent
   run: true,
   variants: {
     control: { percentageSplit: "0.5", pages: ["/current"], label: "Control" },
