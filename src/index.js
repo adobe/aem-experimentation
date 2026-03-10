@@ -1104,7 +1104,7 @@ export async function loadEager(document, options = {}) {
   const ns = window.aem || window.hlx || {};
   ns.experimentation = { version: VERSION };
 
-  // Detect variant pages (has experiment ID + control path but no variant definitions)
+  // Detect variant pages (has experiment ID + control path only)
   const controlPath = getMetadata(`${pluginOptions.experimentsMetaTagPrefix}-control-path`);
   const experimentId = getMetadata(pluginOptions.experimentsMetaTagPrefix);
   if (controlPath && experimentId) {
