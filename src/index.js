@@ -1103,6 +1103,17 @@ export async function loadEager(document, options = {}) {
 
   const ns = window.aem || window.hlx || {};
   ns.experimentation = { version: VERSION };
+
+  // Detect variant pages (has experiment ID + control path only)
+  const controlPath = getMetadata(`${pluginOptions.experimentsMetaTagPrefix}-control-path`);
+  const experimentId = getMetadata(pluginOptions.experimentsMetaTagPrefix);
+  if (controlPath && experimentId) {
+    ns.variantPage = {
+      controlPath,
+      experimentId,
+    };
+  }
+
   ns.audiences = await serveAudience(document, pluginOptions);
   ns.experiments = await runExperiment(document, pluginOptions);
   ns.campaigns = await runCampaign(document, pluginOptions);
