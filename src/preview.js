@@ -53,7 +53,11 @@ function createButton(label) {
   const button = document.createElement('button');
   button.className = 'hlx-badge';
   const text = document.createElement('span');
-  text.textContent = label;
+  if (label instanceof HTMLElement) {
+    text.appendChild(label);
+  } else {
+    text.textContent = label;
+  }
   button.append(text);
   return button;
 }
@@ -64,7 +68,11 @@ function createPopupItem(item) {
 
   const label = document.createElement('h5');
   label.className = 'hlx-popup-item-label';
-  label.textContent = typeof item === 'object' ? item.label : item;
+  if (typeof item === 'object' && item.label instanceof HTMLElement) {
+    label.appendChild(item.label);
+  } else {
+    label.textContent = typeof item === 'object' ? item.label : item;
+  }
   div.appendChild(label);
 
   if (item.description) {
@@ -89,16 +97,20 @@ function createPopupItem(item) {
       
       const link = document.createElement('a');
       link.href = action.href || '#';
-      link.textContent = action.label;
-      
+      if (action.label instanceof HTMLElement) {
+        link.appendChild(action.label);
+      } else {
+        link.textContent = action.label;
+      }
+
       if (action.onclick) {
         link.addEventListener('click', action.onclick);
       }
-      
+
       buttonDiv.appendChild(link);
       actionsDiv.appendChild(buttonDiv);
     });
-    
+
     div.appendChild(actionsDiv);
   }
 
@@ -120,7 +132,11 @@ function createPopupDialog(header, items = []) {
   
   const headerLabel = document.createElement('h5');
   headerLabel.className = 'hlx-popup-header-label';
-  headerLabel.textContent = typeof header === 'object' ? header.label : header;
+  if (typeof header === 'object' && header.label instanceof HTMLElement) {
+    headerLabel.appendChild(header.label);
+  } else {
+    headerLabel.textContent = typeof header === 'object' ? header.label : header;
+  }
   headerDiv.appendChild(headerLabel);
   
   if (header.description) {
@@ -144,12 +160,16 @@ function createPopupDialog(header, items = []) {
       
       const link = document.createElement('a');
       link.href = action.href || '#';
-      link.textContent = action.label;
-      
+      if (action.label instanceof HTMLElement) {
+        link.appendChild(action.label);
+      } else {
+        link.textContent = action.label;
+      }
+
       if (action.onclick) {
         link.addEventListener('click', action.onclick);
       }
-      
+
       buttonDiv.appendChild(link);
       headerActions.appendChild(buttonDiv);
     });
@@ -197,7 +217,11 @@ function createToggleButton(label) {
   button.setAttribute('aria-pressed', false);
   button.setAttribute('tabindex', 0);
   const text = document.createElement('span');
-  text.textContent = label;
+  if (label instanceof HTMLElement) {
+    text.appendChild(label);
+  } else {
+    text.textContent = label;
+  }
   button.append(text);
   button.addEventListener('click', () => {
     button.setAttribute('aria-pressed', button.getAttribute('aria-pressed') === 'false');
@@ -477,7 +501,7 @@ async function decorateExperimentPill(overlay, options, context) {
       actions: [
         ...config.manifest ? [{ label: 'Manifest', href: config.manifest }] : [],
         {
-          label: '<span style="font-size:2em;line-height:1em">⚙</span>',
+          label: (() => { const s = document.createElement('span'); s.style.cssText = 'font-size:2em;line-height:1em'; s.textContent = '⚙'; return s; })(),
           onclick: async () => {
             // eslint-disable-next-line no-alert
             const key = window.prompt(
@@ -527,7 +551,7 @@ function createCampaign(campaign, isSelected, options) {
   }
 
   return {
-    label: `<code>${campaign}</code>`,
+    label: (() => { const c = document.createElement('code'); c.textContent = campaign; return c; })(),
     actions: [{ label: 'Simulate', href: url.href }],
     isSelected,
   };
@@ -595,7 +619,7 @@ function createAudience(audience, isSelected, options) {
   url.searchParams.set(options.audiencesQueryParameter, audience);
 
   return {
-    label: `<code>${audience}</code>`,
+    label: (() => { const c = document.createElement('code'); c.textContent = audience; return c; })(),
     actions: [{ label: 'Simulate', href: url.href }],
     isSelected,
   };
