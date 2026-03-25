@@ -1,3 +1,10 @@
+## [1.0.5](https://github.com/adobe/aem-experimentation/compare/v1.0.4...v1.0.5) (2026-03-25)
+
+
+### Bug Fixes
+
+* render preview overlay labels as DOM elements instead of HTML st… ([#60](https://github.com/adobe/aem-experimentation/issues/60)) ([25e82c3](https://github.com/adobe/aem-experimentation/commit/25e82c3ed00c34f96404ed013baceef4785cbf56)), closes [#52](https://github.com/adobe/aem-experimentation/issues/52) [#59](https://github.com/adobe/aem-experimentation/issues/59) [#52](https://github.com/adobe/aem-experimentation/issues/52)
+
 ## [1.0.4](https://github.com/adobe/aem-experimentation/compare/v1.0.3...v1.0.4) (2025-07-21)
 
 
