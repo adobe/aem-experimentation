@@ -11,6 +11,7 @@
  */
 
 let isDebugEnabled;
+let isCommunicationLayerInitialized = false;
 export function setDebugMode(url, pluginOptions) {
   const { host, hostname, origin } = url;
   const { isProd, prodHost } = pluginOptions;
@@ -48,9 +49,25 @@ export const DEFAULT_OPTIONS = {
 
   // Redecoration function for fragments
   decorateFunction: () => {},
+
+  // Which simulation UI to wire up in preview/dev environments:
+  // - 'auto' (default): wire up the AEM Sidekick panel if/when the Sidekick is present
+  // - 'sidekick': same as 'auto', but explicit
+  // - 'universal-editor': the panel is delivered as a UE extension, so stay out of the way
+  // - false: do not load any simulation UI
+  simulationUI: 'auto',
 };
 
 const CONSENT_STORAGE_KEY = 'experimentation-consented';
+
+// Simulation UI (AEM Sidekick) integration.
+// The panel itself ships as a hosted micro-frontend that the Sidekick extension
+// loads on demand; the plugin only wires the toolbar button to it.
+const SIMULATION_MFE_URL = 'https://experience.adobe.com/solutions/ExpSuccess-aem-experimentation-mfe/static-assets/resources/sidekick/client.js?source=plugin';
+const SIMULATION_SIDEKICK_EVENT = 'custom:aem-experimentation-sidekick';
+const SIMULATION_PANEL_ID = 'aemExperimentation';
+const SIMULATION_PANEL_HIDDEN_CLASS = 'aemExperimentationHidden';
+const SIMULATION_PANEL_REOPEN_KEY = 'aem-experimentation-simulation-open';
 
 /**
  * Converts a given comma-seperate string to an array.
@@ -1042,6 +1059,11 @@ async function serveAudience(document, pluginOptions) {
 
 // Support new Rail UI communication
 function setupCommunicationLayer(options) {
+  // Both loadEager and loadLazy may call this; only ever register once.
+  if (isCommunicationLayerInitialized) {
+    return;
+  }
+  isCommunicationLayerInitialized = true;
   window.addEventListener('message', async (event) => {
     if (event.data && event.data.type === 'hlx:last-modified-request') {
       const { url } = event.data;
@@ -1092,9 +1114,127 @@ function setupCommunicationLayer(options) {
       event.data?.type === 'hlx:experimentation-window-reload'
       && event.data?.action === 'reload'
     ) {
+      // Preserve the panel's open state across the reload so it re-opens once
+      // the page comes back (see setupSimulationUI).
+      try {
+        window.sessionStorage.setItem(SIMULATION_PANEL_REOPEN_KEY, 'true');
+      } catch (e) {
+        debug('Failed to persist simulation panel state:', e);
+      }
       window.location.reload();
     }
   });
+}
+
+/**
+ * Creates a controller for the hosted simulation panel that loads the MFE once
+ * (on first use) and then just toggles its visibility.
+ * @param {Document} doc The document object
+ * @returns {{ open: Function, toggle: Function }} the panel controller
+ */
+function createSimulationPanelController(doc) {
+  let loadPromise = null;
+
+  const togglePanel = (forceShow = false) => {
+    const container = doc.getElementById(SIMULATION_PANEL_ID);
+    if (!container) {
+      return;
+    }
+    if (forceShow) {
+      container.classList.remove(SIMULATION_PANEL_HIDDEN_CLASS);
+    } else {
+      container.classList.toggle(SIMULATION_PANEL_HIDDEN_CLASS);
+    }
+  };
+
+  const load = () => {
+    if (loadPromise) {
+      return loadPromise;
+    }
+    loadPromise = new Promise((resolve, reject) => {
+      const script = doc.createElement('script');
+      script.src = SIMULATION_MFE_URL;
+      script.onload = () => {
+        // The MFE injects its own container asynchronously, so wait for it to
+        // appear (bounded) before resolving.
+        let tries = 0;
+        const waitForContainer = () => {
+          if (doc.getElementById(SIMULATION_PANEL_ID) || tries >= 20) {
+            resolve();
+          } else {
+            tries += 1;
+            setTimeout(waitForContainer, 200);
+          }
+        };
+        waitForContainer();
+      };
+      script.onerror = reject;
+      doc.head.appendChild(script);
+    });
+    return loadPromise;
+  };
+
+  const open = () => load()
+    .then(() => togglePanel(true))
+    .catch((e) => debug('Failed to open simulation panel:', e));
+
+  const toggle = () => {
+    // The first interaction loads the MFE and reveals the panel; afterwards we
+    // just show/hide the already-loaded panel.
+    if (!loadPromise) {
+      return open();
+    }
+    togglePanel(false);
+    return loadPromise;
+  };
+
+  return { open, toggle };
+}
+
+/**
+ * Wires up the AEM Sidekick simulation panel: binds the toolbar button to the
+ * panel, opens it on a simulation deep-link, and restores it after a reload.
+ * @param {Object} pluginOptions the plugin options
+ * @param {Document} doc The document object
+ */
+function setupSimulationUI(pluginOptions, doc) {
+  const panel = createSimulationPanelController(doc);
+
+  const attachToSidekick = (sk) => {
+    sk.addEventListener(SIMULATION_SIDEKICK_EVENT, () => panel.toggle());
+  };
+
+  // The Sidekick custom element may be injected by the extension after this
+  // runs, so fall back to its ready event.
+  const sidekick = doc.querySelector('aem-sidekick, helix-sidekick');
+  if (sidekick) {
+    attachToSidekick(sidekick);
+  } else {
+    doc.addEventListener('sidekick-ready', () => {
+      const sk = doc.querySelector('aem-sidekick, helix-sidekick');
+      if (sk) {
+        attachToSidekick(sk);
+      }
+    }, { once: true });
+  }
+
+  // Open the panel straight away when the page is loaded with a simulation
+  // deep-link (e.g. ?experiment=<id>/<variant> shared from the panel).
+  const usp = new URLSearchParams(window.location.search);
+  const [experimentId, variantId] = (usp.get(pluginOptions.experimentsQueryParameter) || '').split('/');
+  if (experimentId && variantId) {
+    panel.open();
+  }
+
+  // Re-open the panel after a variant switch forced a full-page reload.
+  try {
+    if (window.sessionStorage.getItem(SIMULATION_PANEL_REOPEN_KEY) === 'true') {
+      window.sessionStorage.removeItem(SIMULATION_PANEL_REOPEN_KEY);
+      panel.open();
+    }
+  } catch (e) {
+    debug('Failed to read simulation panel state:', e);
+  }
 }
 
 export async function loadEager(document, options = {}) {
@@ -1117,6 +1257,41 @@ export async function loadEager(document, options = {}) {
   }
 }
 
-export async function loadLazy() {
-  // Placeholder for lazy loading functionality
+/**
+ * Loads the simulation UI used to preview and switch experiment variants.
+ *
+ * Since v2 the simulation panel is a hosted micro-frontend that the AEM Sidekick
+ * extension opens on demand. This wires the Sidekick toolbar button to that
+ * panel and lazy-loads it on first use. It is an authoring aid, so it only runs
+ * in preview/development environments, never in production.
+ *
+ * In the Universal Editor the panel is delivered as a UE extension instead, so
+ * pass `simulationUI: 'universal-editor'` (or `false`) to keep the plugin out of
+ * the way there. The default `'auto'` only activates when the Sidekick is present.
+ *
+ * Call this from your project's `loadLazy()` in `scripts.js`, alongside the
+ * `loadEager()` call in `loadEager()`.
+ *
+ * @param {Document} document The document object.
+ * @param {Object} options The experimentation configuration.
+ */
+export async function loadLazy(document, options = {}) {
+  const pluginOptions = { ...DEFAULT_OPTIONS, ...options };
+
+  // Authoring aid only — never surface the simulation UI in production.
+  if (!setDebugMode(window.location, pluginOptions)) {
+    return;
+  }
+
+  // In the Universal Editor a dedicated UE extension owns the panel.
+  if (pluginOptions.simulationUI === false || pluginOptions.simulationUI === 'universal-editor') {
+    return;
+  }
+
+  // Ensure the postMessage handshake the panel talks over is available, even on
+  // preview pages that have no experiment configured yet (where loadEager's own
+  // call to it never ran). This is a no-op if already set up.
+  setupCommunicationLayer(pluginOptions);
+
+  setupSimulationUI(pluginOptions, document);
 }

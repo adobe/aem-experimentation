@@ -83,6 +83,37 @@ export async function runExperimentation(document, config) {
   }
 }
 
+/**
+ * Loads the experimentation simulation UI (lazy).
+ * The simulation panel is an authoring aid, so this is a no-op in production —
+ * the coarse check below avoids even fetching the plugin there, and the plugin
+ * re-checks authoritatively before showing anything.
+ * @param {Document} document The document object.
+ * @param {Object} config The experimentation configuration.
+ * @returns {Promise<void>} A promise that resolves when the simulation UI is loaded.
+ */
+export async function runExperimentationLazy(document, config) {
+  const { host, hostname, origin } = window.location;
+  const isPreview = hostname === 'localhost'
+    || hostname.endsWith('.page')
+    || (typeof config.isProd === 'function' && !config.isProd())
+    || (config.prodHost && ![host, hostname, origin].includes(config.prodHost));
+  if (!isPreview) {
+    return null;
+  }
+
+  try {
+    const { loadLazy } = await import(
+      '../plugins/experimentation/src/index.js'
+    );
+    return loadLazy(document, config);
+  } catch (error) {
+    // eslint-disable-next-line no-console
+    console.error('Failed to load experimentation module (lazy):', error);
+    return null;
+  }
+}
+
 ```
 
 > **Note:** Add the following line to your `head.html` to preload the experiment loader script:
@@ -97,6 +128,7 @@ Add the following import and configuration at the top of your `scripts/scripts.j
 ```js
 import {
   runExperimentation,
+  runExperimentationLazy,
 } from './experiment-loader.js';
 
 const experimentationConfig = {
@@ -115,6 +147,17 @@ Then, add the following line early in your `loadEager()` function:
 async function loadEager(doc) {
   // ... existing code ...
   await runExperimentation(doc, experimentationConfig);
+  // ... rest of your code ...
+}
+```
+
+And add the following line to your `loadLazy()` function to enable the simulation
+panel (see [Enabling the simulation panel](#enabling-the-simulation-panel-aem-sidekick) below):
+
+```js
+async function loadLazy(doc) {
+  // ... existing code ...
+  await runExperimentationLazy(doc, experimentationConfig);
   // ... rest of your code ...
 }
 ```
@@ -185,7 +228,14 @@ const experimentationConfig = {
     /* handle custom decoration here, for example: */
     buildBlock(el);
     decorateBlock(el);
-  }
+  },
+
+  /* Which simulation UI to wire up in preview/dev (see the section below) */
+  // - 'auto' (default): wire up the AEM Sidekick panel if/when the Sidekick is present
+  // - 'sidekick': same as 'auto', but explicit
+  // - 'universal-editor': the panel is delivered as a UE extension, so stay out of the way
+  // - false: do not load any simulation UI
+  simulationUI: 'auto',
 };
 ```
 
@@ -200,6 +250,59 @@ Fragment replacement is handled by async observer, which may execute before or a
 2. Have a `.block` selector and  need to redecorate => switch block status to `"loading"` and call `loadBlock(el)`
 3. Have a `.section` selector and need to redecorate => call `decorateBlocks(el)`
 4. Have a `main` selector and need to redecorate => call `decorateMain(el)`
+
+### Enabling the simulation panel (AEM Sidekick)
+
+Starting with v2, the plugin no longer injects its own in-page overlay to simulate and switch
+between experiment variants. That panel now ships as a micro-frontend (MFE) that Adobe's
+[AEM Sidekick browser extension](https://chromewebstore.google.com/detail/aem-sidekick/igkmdomcgoebiipaifhmpfjhbjccggml)
+opens on demand.
+
+The plugin loads and toggles that panel for you from `loadLazy()` — you do **not** need to copy any
+listener script into your project or add anything to `head.html`. Make sure you've wired
+`runExperimentationLazy` into your `scripts.js` `loadLazy()` as shown in
+[Step 2](#step-2-update-scriptsscriptsjs) above. The panel only loads in preview/development
+environments, never in production, and only when the Sidekick is present (see the `simulationUI`
+option to change this — for example in the Universal Editor, where the panel is delivered as a UE
+extension instead).
+
+The one thing the plugin can't do for you is register the Sidekick toolbar button, since that lives
+in your project's Sidekick config, not in page code. Add the following plugin entry to
+`tools/sidekick/config.json` in your project (a copy also lives at
+[`documentation/sidekick/config.json`](./documentation/sidekick/config.json)):
+
+```json
+{
+  "plugins": [
+    {
+      "id": "aem-experimentation",
+      "titleI18n": {
+        "en": "Experimentation"
+      },
+      "environments": [
+        "preview"
+      ],
+      "includePaths": [
+        "**.docx**"
+      ],
+      "event": "aem-experimentation-sidekick"
+    }
+  ]
+}
+```
+
+> **Note:** if your project has been migrated to AEM's unified ("helix5") config format — for
+> instance via [Experience Workspace](https://docs.da.live/about/early-access/experience-workspace) —
+> committing this file alone is not enough. Sidekick reads its config from your persisted site config
+> (`https://admin.hlx.page/config/{org}/sites/{site}.json`), not a live read of
+> `tools/sidekick/config.json` off the code bus, so you need to merge a matching `sidekick.plugins`
+> array into that persisted config directly. Note also that this admin API's verbs are inverted from
+> typical REST conventions: **`PUT`** only *creates* a config that doesn't exist yet (and fails with
+> `config already exists` if one is already there) — **`POST`** is what updates an existing config.
+
+Once the button is registered and `runExperimentationLazy` is wired up, clicking the
+"Experimentation" button in Sidekick opens the panel. A shared simulation link
+(`?experiment=<experiment-id>/<variant-name>`) also opens the panel automatically on page load.
 
 ## Extensibility & integrations
 
