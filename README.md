@@ -4,7 +4,7 @@ The AEM Experimentation plugin helps you quickly set up experimentation and segm
 It is currently available to customers in collaboration with AEM Engineering via co-innovation VIP Projects. 
 To implement experimentation or personalization use-cases, please reach out to the AEM Engineering team in the Slack channel dedicated to your project.
 
-> **Note:** We are adding new support for the contextual experimentation rail UI. This is still under development. Feel free to reach out if you have any questions via email: aem-contextual-experimentation@adobe.com.
+> **Note:** We are adding new support for the contextual experimentation rail UI. This is still under development. Feel free to reach out if you have any questions via email: aem-contextual-experimentation@adobe.com. See [Enabling the Sidekick Experimentation panel](#enabling-the-sidekick-experimentation-panel) below for the project setup this requires.
 
 ## Features
 
@@ -200,6 +200,255 @@ Fragment replacement is handled by async observer, which may execute before or a
 2. Have a `.block` selector and  need to redecorate => switch block status to `"loading"` and call `loadBlock(el)`
 3. Have a `.section` selector and need to redecorate => call `decorateBlocks(el)`
 4. Have a `main` selector and need to redecorate => call `decorateMain(el)`
+
+### Enabling the Sidekick Experimentation panel
+
+Starting with v2, this plugin no longer injects an in-page overlay itself. The panel used to
+simulate and switch between experiment variants now ships as a micro-frontend (MFE) that Adobe's
+[AEM Sidekick browser extension](https://chromewebstore.google.com/detail/aem-sidekick/igkmdomcgoebiipaifhmpfjhbjccggml)
+loads on demand. The plugin's own code (`setupCommunicationLayer` in `src/index.js`) only
+implements the `postMessage` handshake the panel talks over — you still need to register and load
+a small Sidekick plugin in your project for the button to appear in Sidekick and actually do
+something when clicked.
+
+#### 1. Register the plugin in your Sidekick config
+
+Sidekick reads its plugin list from your project's persisted admin config, which needs a `plugins`
+entry. Add the following to `tools/sidekick/config.json` in your project (a copy of this file also
+lives at [`documentation/sidekick/config.json`](./documentation/sidekick/config.json) in this repo):
+
+```json
+{
+  "plugins": [
+    {
+      "id": "aem-experimentation",
+      "titleI18n": {
+        "en": "Experimentation"
+      },
+      "environments": [
+        "preview"
+      ],
+      "includePaths": [
+        "**.docx**"
+      ],
+      "event": "aem-experimentation-sidekick"
+    }
+  ]
+}
+```
+
+> **Note:** if your project has been migrated to AEM's unified ("helix5") config format — for
+> instance, if you've set up
+> [Experience Workspace](https://docs.da.live/about/early-access/experience-workspace) — committing
+> this file alone is not enough. Sidekick reads its config from
+> `https://admin.hlx.page/sidekick/{org}/{repo}/{ref}/config.json`, which for a migrated
+> project is backed by your persisted site config at
+> `https://admin.hlx.page/config/{org}/sites/{site}.json`, not a live read of `tools/sidekick/config.json`
+> off the code bus. You'll need to merge a matching `sidekick.plugins` array into that persisted
+> config directly (`GET` it, add `plugins` under `sidekick`, send it back). Also note that this
+> admin API's verbs are inverted from typical REST conventions: **`PUT`** only *creates* a config
+> that doesn't exist yet, and fails with `config already exists` (`AEM_BACKEND_CONFIG_CREATE`) if
+> one is already there — **`POST`** is what actually updates an existing config.
+
+#### 2. Add the page-side listener script
+
+Create `tools/sidekick/aem-experimentation.js` in your project with the following content (also
+available at [`documentation/sidekick/aem-experimentation.js`](./documentation/sidekick/aem-experimentation.js)
+in this repo):
+
+```js
+/* eslint-disable */
+(function () {
+  function isDebugEnvironment() {
+    const { host, hostname, origin } = window.location;
+
+    return (
+      hostname === 'localhost' ||
+      hostname.endsWith('.page') ||
+      (window.hlx?.experimentation?.options?.isProd &&
+        typeof window.hlx.experimentation?.options?.isProd === 'function' &&
+        !window.hlx.experimentation?.options?.isProd()) ||
+      (window.hlx?.experimentation?.options?.prodHost &&
+        ![host, hostname, origin].includes(
+          window.hlx.experimentation?.options?.prodHost
+        )) ||
+      false
+    );
+  }
+
+  if (!isDebugEnvironment()) {
+    // eslint-disable-next-line no-console
+    console.log(
+      '[AEM Exp] Experimentation UI disabled in production environment'
+    );
+    return;
+  }
+
+  let isAEMExperimentationAppLoaded = false;
+  let scriptLoadPromise = null;
+  let isHandlingSimulation = false;
+
+  function toggleExperimentPanel(forceShow = false) {
+    const container = document.getElementById('aemExperimentation');
+    if (container) {
+      if (forceShow) {
+        container.classList.remove('aemExperimentationHidden');
+      } else {
+        container.classList.toggle('aemExperimentationHidden');
+      }
+    }
+  }
+
+  function loadAEMExperimentationApp() {
+    if (scriptLoadPromise) {
+      return scriptLoadPromise;
+    }
+
+    scriptLoadPromise = new Promise((resolve, reject) => {
+      if (isAEMExperimentationAppLoaded) {
+        resolve();
+        return;
+      }
+
+      const script = document.createElement('script');
+      script.src =
+        'https://experience.adobe.com/solutions/ExpSuccess-aem-experimentation-mfe/static-assets/resources/sidekick/client.js?source=plugin';
+
+      script.onload = function () {
+        isAEMExperimentationAppLoaded = true;
+        const waitForContainer = (retries = 0, maxRetries = 20) => {
+          const container = document.getElementById('aemExperimentation');
+          if (container) {
+            toggleExperimentPanel(true);
+            resolve();
+          } else if (retries < maxRetries) {
+            setTimeout(() => waitForContainer(retries + 1, maxRetries), 200);
+          } else {
+            resolve();
+          }
+        };
+
+        waitForContainer();
+      };
+
+      script.onerror = reject;
+      document.head.appendChild(script);
+    });
+
+    return scriptLoadPromise;
+  }
+
+  function checkExperimentParams() {
+    const urlParams = new URLSearchParams(window.location.search);
+    const experimentParam = urlParams.get('experiment');
+
+    if (experimentParam && !isHandlingSimulation) {
+      const decodedParam = decodeURIComponent(experimentParam);
+
+      const [experimentId, variantId] = decodedParam.split('/');
+      if (experimentId && variantId) {
+        isHandlingSimulation = true;
+        loadAEMExperimentationApp()
+          .then(() => {
+            toggleExperimentPanel(true);
+          })
+          .catch((error) => {
+            console.error('[AEM Exp] Error loading app:', error);
+          });
+      }
+    }
+  }
+
+  function handleSidekickPluginButtonClick() {
+    if (!isAEMExperimentationAppLoaded) {
+      loadAEMExperimentationApp()
+        .then(() => {
+          console.log('[AEM Exp] First load - showing panel');
+          toggleExperimentPanel(true);
+        })
+        .catch((error) => {
+          console.error('[AEM Exp] Failed to load:', error);
+        });
+    } else {
+      toggleExperimentPanel(false);
+    }
+  }
+
+  // Initialize Sidekick
+  const sidekick = document.querySelector('helix-sidekick, aem-sidekick');
+  if (sidekick) {
+    sidekick.addEventListener(
+      'custom:aem-experimentation-sidekick',
+      handleSidekickPluginButtonClick
+    );
+  } else {
+    document.addEventListener(
+      'sidekick-ready',
+      () => {
+        const sidekickElement = document.querySelector(
+          'helix-sidekick, aem-sidekick'
+        );
+        if (sidekickElement) {
+          sidekickElement.addEventListener(
+            'custom:aem-experimentation-sidekick',
+            handleSidekickPluginButtonClick
+          );
+        }
+      },
+      { once: true }
+    );
+  }
+
+  // Check for experiment parameters on load
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', checkExperimentParams);
+  } else {
+    checkExperimentParams();
+  }
+
+  window.addEventListener('message', function (event) {
+    if (!event.data) return;
+
+    const shouldReload =
+      event.data.type === 'hlx:experimentation-window-reload' &&
+      event.data.action === 'reload';
+
+    if (shouldReload) {
+      sessionStorage.setItem('aem_experimentation_open_panel', 'true');
+      window.location.reload();
+    }
+  });
+
+  if (sessionStorage.getItem('aem_experimentation_open_panel') === 'true') {
+    sessionStorage.removeItem('aem_experimentation_open_panel');
+    handleSidekickPluginButtonClick();
+  }
+})();
+```
+
+This script listens for the `custom:aem-experimentation-sidekick` event that Sidekick dispatches
+when the toolbar button is clicked, and lazily loads Adobe's hosted panel
+(`experience.adobe.com/.../sidekick/client.js`) the first time it's needed. It also opens the panel
+automatically if the page URL already has an `?experiment=<id>/<variant>` simulation parameter, so
+a shared simulation link opens straight into the panel.
+
+#### 3. Load the script on every page
+
+Unlike `scripts/experiment-loader.js`, this file is a classic (non-module) script and is **not**
+loaded automatically — nothing else in the plugin or in a default boilerplate project references
+it. Add it to your project's `head.html`:
+
+```html
+<script nonce="aem" src="/tools/sidekick/aem-experimentation.js"></script>
+```
+
+Match whatever CSP nonce your project already uses on its other `<script>` tags. Omitting the
+nonce on a project with a strict `script-src` policy causes the tag to be silently blocked, with no
+console error — which looks identical to the plugin config simply being wrong.
+
+If this script never loads, clicking the Sidekick's "Experimentation" button will look like it does
+nothing: the button correctly dispatches its custom event, but with no listener registered on the
+page there's nobody to catch it, so nothing visibly happens and no error is thrown either.
 
 ## Extensibility & integrations
 

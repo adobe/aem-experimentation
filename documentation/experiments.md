@@ -282,11 +282,18 @@ The same spreadsheet can also contain the configuration for several pages at onc
 
 ### Simulation
 
-Once all of this is set up, authors will have access to an overlay on `localhost` and on the stage environments (i.e. `*.hlx.stage`) that lets them see what experiment and variants have been configured for the page and switch between each to visualize the content variations accordingly.
+> **Note:** the screenshot below and the "overlay pill" described in this section reflect the v1
+> plugin. In v2, that overlay is no longer injected by the plugin's own code — it's now delivered
+> as a panel by the [AEM Sidekick browser extension](https://chromewebstore.google.com/detail/aem-sidekick/igkmdomcgoebiipaifhmpfjhbjccggml),
+> which requires additional one-time setup in your project. See
+> [Enabling the Sidekick Experimentation panel](../README.md#enabling-the-sidekick-experimentation-panel)
+> in the main README.
+
+Once all of this is set up, authors will have access to a panel that lets them see what experiment and variants have been configured for the page and switch between each to visualize the content variations accordingly.
 
 ![audience overlay](./images/experiments-overlay.png)
 
-The simulation capabilities leverage the `audience` query parameter that is appended to the URL and forcibly let you see the specific content variant.
+The simulation capabilities leverage the `experiment` query parameter (`?experiment=<experiment-id>/<variant-name>`, e.g. `?experiment=hero-test/challenger-1`) that is appended to the URL and forcibly let you see the specific content variant.
 
 ### Inline Reporting
 
