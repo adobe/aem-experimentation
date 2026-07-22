@@ -16,6 +16,11 @@
  * This module is intentionally kept out of the core engine (index.js) and is
  * only ever loaded lazily, in preview/development environments, via a dynamic
  * import from `loadLazy`. Production pages never download or parse it.
+ *
+ * The tiny, UI-less `postMessage` handshake the panel talks over lives in
+ * index.js instead (setupCommunicationLayer), so it can be registered eagerly
+ * and never miss a bookmarklet-injected MFE. This module owns only the heavy
+ * part: loading the hosted MFE and wiring the Sidekick toolbar button to it.
  */
 
 /**
@@ -34,81 +39,8 @@ const SIMULATION_MFE_URL = 'https://experience.adobe.com/solutions/ExpSuccess-ae
 const SIMULATION_SIDEKICK_EVENT = 'custom:aem-experimentation-sidekick';
 const SIMULATION_PANEL_ID = 'aemExperimentation';
 const SIMULATION_PANEL_HIDDEN_CLASS = 'aemExperimentationHidden';
-const SIMULATION_PANEL_REOPEN_KEY = 'aem-experimentation-simulation-open';
 
-let isCommunicationLayerInitialized = false;
-
-/**
- * Sets up the postMessage handshake the hosted panel/rail UI talks over.
- * @param {Object} options the plugin options
- */
-function setupCommunicationLayer(options) {
-  // Only ever register once.
-  if (isCommunicationLayerInitialized) {
-    return;
-  }
-  isCommunicationLayerInitialized = true;
-  window.addEventListener('message', async (event) => {
-    if (event.data && event.data.type === 'hlx:last-modified-request') {
-      const { url } = event.data;
-
-      try {
-        const response = await fetch(url, {
-          method: 'HEAD',
-          cache: 'no-store',
-          headers: {
-            'Cache-Control': 'no-cache',
-          },
-        });
-
-        const lastModified = response.headers.get('Last-Modified');
-
-        event.source.postMessage(
-          {
-            type: 'hlx:last-modified-response',
-            url,
-            lastModified,
-            status: response.status,
-          },
-          event.origin,
-        );
-      } catch (error) {
-        // eslint-disable-next-line no-console
-        console.error('Error fetching Last-Modified header:', error);
-      }
-    } else if (event.data?.type === 'hlx:experimentation-get-config') {
-      try {
-        const safeClone = JSON.parse(JSON.stringify(window.hlx));
-        if (options.prodHost) {
-          safeClone.prodHost = options.prodHost;
-        }
-        event.source.postMessage(
-          {
-            type: 'hlx:experimentation-config',
-            config: safeClone,
-            source: 'index-js',
-          },
-          '*',
-        );
-      } catch (e) {
-        // eslint-disable-next-line no-console
-        console.error('Error sending hlx config:', e);
-      }
-    } else if (
-      event.data?.type === 'hlx:experimentation-window-reload'
-      && event.data?.action === 'reload'
-    ) {
-      // Preserve the panel's open state across the reload so it re-opens once
-      // the page comes back (see setupSimulationUI).
-      try {
-        window.sessionStorage.setItem(SIMULATION_PANEL_REOPEN_KEY, 'true');
-      } catch (e) {
-        debug('Failed to persist simulation panel state:', e);
-      }
-      window.location.reload();
-    }
-  });
-}
+let isSimulationUIInitialized = false;
 
 /**
  * Creates a controller for the hosted simulation panel that loads the MFE once
@@ -143,7 +75,13 @@ function createSimulationPanelController(doc) {
         // appear (bounded) before resolving.
         let tries = 0;
         const waitForContainer = () => {
-          if (doc.getElementById(SIMULATION_PANEL_ID) || tries >= 20) {
+          if (doc.getElementById(SIMULATION_PANEL_ID)) {
+            resolve();
+          } else if (tries >= 20) {
+            // Resolve anyway so we don't hang, but flag it: a subsequent
+            // togglePanel() will silently no-op without a container, so this
+            // distinguishes "MFE never injected its panel" from "button not wired".
+            debug('Simulation panel container did not appear after loading the MFE; the panel will not toggle.');
             resolve();
           } else {
             tries += 1;
@@ -152,7 +90,12 @@ function createSimulationPanelController(doc) {
         };
         waitForContainer();
       };
-      script.onerror = reject;
+      script.onerror = (e) => {
+        // Drop the cached (rejected) promise so the next toggle retries the
+        // load instead of permanently bricking the button on a transient blip.
+        loadPromise = null;
+        reject(e);
+      };
       doc.head.appendChild(script);
     });
     return loadPromise;
@@ -180,26 +123,58 @@ function createSimulationPanelController(doc) {
  * panel, opens it on a simulation deep-link, and restores it after a reload.
  * @param {Object} pluginOptions the plugin options
  * @param {Document} doc The document object
+ * @param {string} reopenKey sessionStorage key used to re-open after a reload
  */
-function setupSimulationUI(pluginOptions, doc) {
+function setupSimulationUI(pluginOptions, doc, reopenKey) {
+  // Guard against a consumer's loadLazy running more than once (e.g. on
+  // client-side navigation), which would otherwise stack duplicate button
+  // listeners and make each click toggle the panel twice — appearing dead.
+  if (isSimulationUIInitialized) {
+    return;
+  }
+  isSimulationUIInitialized = true;
+
   const panel = createSimulationPanelController(doc);
 
+  const SIDEKICK_SELECTOR = 'aem-sidekick, helix-sidekick';
+  const SIDEKICK_BOUND_ATTR = 'data-aem-experimentation-bound';
+
   const attachToSidekick = (sk) => {
+    // Multiple discovery paths (sync query, sidekick-ready, and the poll below)
+    // may all fire, so only bind the toggle listener once per element.
+    if (sk.hasAttribute(SIDEKICK_BOUND_ATTR)) {
+      return;
+    }
+    sk.setAttribute(SIDEKICK_BOUND_ATTR, '');
     sk.addEventListener(SIMULATION_SIDEKICK_EVENT, () => panel.toggle());
   };
 
-  // The Sidekick custom element may be injected by the extension after this
-  // runs, so fall back to its ready event.
-  const sidekick = doc.querySelector('aem-sidekick, helix-sidekick');
+  // The Sidekick custom element is injected by the extension asynchronously and
+  // may appear before or after this runs. Bind if it's already here; otherwise
+  // listen for its ready event AND poll briefly, since the event can fire before
+  // our listener is attached and would otherwise be missed silently.
+  const sidekick = doc.querySelector(SIDEKICK_SELECTOR);
   if (sidekick) {
     attachToSidekick(sidekick);
   } else {
     doc.addEventListener('sidekick-ready', () => {
-      const sk = doc.querySelector('aem-sidekick, helix-sidekick');
+      const sk = doc.querySelector(SIDEKICK_SELECTOR);
       if (sk) {
         attachToSidekick(sk);
       }
     }, { once: true });
+
+    let tries = 0;
+    const pollForSidekick = () => {
+      const sk = doc.querySelector(SIDEKICK_SELECTOR);
+      if (sk) {
+        attachToSidekick(sk);
+      } else if (tries < 20) {
+        tries += 1;
+        setTimeout(pollForSidekick, 200);
+      }
+    };
+    pollForSidekick();
   }
 
   // Open the panel straight away when the page is loaded with a simulation
@@ -212,8 +187,8 @@ function setupSimulationUI(pluginOptions, doc) {
 
   // Re-open the panel after a variant switch forced a full-page reload.
   try {
-    if (window.sessionStorage.getItem(SIMULATION_PANEL_REOPEN_KEY) === 'true') {
-      window.sessionStorage.removeItem(SIMULATION_PANEL_REOPEN_KEY);
+    if (window.sessionStorage.getItem(reopenKey) === 'true') {
+      window.sessionStorage.removeItem(reopenKey);
       panel.open();
     }
   } catch (e) {
@@ -222,12 +197,13 @@ function setupSimulationUI(pluginOptions, doc) {
 }
 
 /**
- * Entry point for the lazily-loaded simulation UI. Sets up the postMessage
- * handshake and wires up the Sidekick panel.
+ * Entry point for the lazily-loaded simulation UI. Wires up the Sidekick panel.
+ * The postMessage handshake it talks over is set up eagerly in index.js
+ * (setupCommunicationLayer), so it already exists by the time this runs.
  * @param {Object} pluginOptions the plugin options
  * @param {Document} doc The document object
+ * @param {string} reopenKey sessionStorage key used to re-open after a reload
  */
-export default function setupSimulation(pluginOptions, doc) {
-  setupCommunicationLayer(pluginOptions);
-  setupSimulationUI(pluginOptions, doc);
+export default function setupSimulation(pluginOptions, doc, reopenKey) {
+  setupSimulationUI(pluginOptions, doc, reopenKey);
 }

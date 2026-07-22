@@ -266,6 +266,15 @@ environments, never in production, and only when the Sidekick is present (see th
 option to change this — for example in the Universal Editor, where the panel is delivered as a UE
 extension instead).
 
+> **Note on performance and preview timing.** The panel's UI and MFE loader live in a separate
+> `simulation.js` chunk that `loadLazy` pulls in via a dynamic `import()` **only** in
+> preview/development, so production pages never download or parse any simulation code. The small,
+> UI-less `postMessage` handshake the panel talks over is the one exception: it's registered eagerly
+> (preview-only, from `loadEager`) so that a Sidekick bookmarklet that injects the panel early in page
+> load still finds a listener. Bumping the plugin therefore keeps the preview handshake working
+> exactly as before — no migration needed — while still keeping the heavy panel UI off the production
+> path.
+
 The one thing the plugin can't do for you is register the Sidekick toolbar button, since that lives
 in your project's Sidekick config, not in page code. Add the following plugin entry to
 `tools/sidekick/config.json` in your project (a copy also lives at
