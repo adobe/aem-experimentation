@@ -29,7 +29,7 @@ export function debug(...args) {
   }
 }
 
-export const VERSION = '1.1.0';
+export const VERSION = '1.2.0';
 
 export const DEFAULT_OPTIONS = {
 
@@ -48,6 +48,13 @@ export const DEFAULT_OPTIONS = {
 
   // Redecoration function for fragments
   decorateFunction: () => {},
+
+  // Which simulation UI to wire up in preview/dev environments:
+  // - 'auto' (default): wire up the AEM Sidekick panel if/when the Sidekick is present
+  // - 'sidekick': same as 'auto', but explicit
+  // - 'universal-editor': the panel is delivered as a UE extension, so stay out of the way
+  // - false: do not load any simulation UI
+  simulationUI: 'auto',
 };
 
 const CONSENT_STORAGE_KEY = 'experimentation-consented';
@@ -1040,8 +1047,34 @@ async function serveAudience(document, pluginOptions) {
   );
 }
 
-// Support new Rail UI communication
+// sessionStorage key used to re-open the simulation panel after a variant
+// switch forces a full-page reload. The reload handler below writes it; the
+// lazily-loaded simulation UI reads it (see src/simulation.js).
+const SIMULATION_PANEL_REOPEN_KEY = 'aem-experimentation-simulation-open';
+
+let isCommunicationLayerInitialized = false;
+
+/**
+ * Sets up the `postMessage` handshake the hosted simulation panel talks over.
+ *
+ * This is deliberately the *only* piece of simulation wiring that lives in the
+ * eager engine: it is a tiny message listener (no UI, no heavy MFE code) and it
+ * must be registered as early as possible. The AEM Sidekick bookmarklet can
+ * inject the panel's `client.js` during page load — before the lazy phase runs
+ * — and the MFE's config request is one-shot, so a listener registered only in
+ * `loadLazy` would miss it and the panel would come up blank/stale. The heavy
+ * MFE loader still lives in the lazily-imported `simulation.js`, so production
+ * pages neither download nor parse any of the panel UI.
+ *
+ * Both `loadEager` and `loadLazy` may call this; the guard makes every call
+ * after the first a no-op.
+ * @param {Object} options the plugin options
+ */
 function setupCommunicationLayer(options) {
+  if (isCommunicationLayerInitialized) {
+    return;
+  }
+  isCommunicationLayerInitialized = true;
   window.addEventListener('message', async (event) => {
     if (event.data && event.data.type === 'hlx:last-modified-request') {
       const { url } = event.data;
@@ -1092,6 +1125,13 @@ function setupCommunicationLayer(options) {
       event.data?.type === 'hlx:experimentation-window-reload'
       && event.data?.action === 'reload'
     ) {
+      // Preserve the panel's open state across the reload so it re-opens once
+      // the page comes back (see setupSimulationUI in src/simulation.js).
+      try {
+        window.sessionStorage.setItem(SIMULATION_PANEL_REOPEN_KEY, 'true');
+      } catch (e) {
+        debug('Failed to persist simulation panel state:', e);
+      }
       window.location.reload();
     }
   });
@@ -1112,11 +1152,52 @@ export async function loadEager(document, options = {}) {
   ns.audience = ns.audiences.find((e) => e.type === 'page');
   ns.campaign = ns.campaigns.find((e) => e.type === 'page');
 
+  // Register the (tiny, UI-less) simulation handshake as early as possible so
+  // an eagerly-injected Sidekick bookmarklet doesn't race past it. Preview/dev
+  // only; the heavy panel UI is still deferred to loadLazy.
   if (isDebugEnabled) {
     setupCommunicationLayer(pluginOptions);
   }
 }
 
-export async function loadLazy() {
-  // Placeholder for lazy loading functionality
+/**
+ * Loads the simulation UI used to preview and switch experiment variants.
+ *
+ * Since v2 the simulation panel is a hosted micro-frontend that the AEM Sidekick
+ * extension opens on demand. It is an authoring aid, so it only runs in
+ * preview/development environments, never in production. The actual UI lives in
+ * a separate `simulation.js` module that is dynamically imported only when
+ * needed, so its code never ships or parses with the core engine.
+ *
+ * In the Universal Editor the panel is delivered as a UE extension instead, so
+ * pass `simulationUI: 'universal-editor'` (or `false`) to keep the plugin out of
+ * the way there. The default `'auto'` only activates when the Sidekick is present.
+ *
+ * Call this from your project's `loadLazy()` in `scripts.js`, alongside the
+ * `loadEager()` call in `loadEager()`.
+ *
+ * @param {Document} document The document object.
+ * @param {Object} options The experimentation configuration.
+ */
+export async function loadLazy(document, options = {}) {
+  const pluginOptions = { ...DEFAULT_OPTIONS, ...options };
+
+  // Authoring aid only — never surface the simulation UI in production.
+  if (!setDebugMode(window.location, pluginOptions)) {
+    return;
+  }
+
+  // In the Universal Editor a dedicated UE extension owns the panel.
+  if (pluginOptions.simulationUI === false || pluginOptions.simulationUI === 'universal-editor') {
+    return;
+  }
+
+  // Ensure the postMessage handshake is available even on preview pages that had
+  // no experiment configured when loadEager ran. No-op if already registered.
+  setupCommunicationLayer(pluginOptions);
+
+  // Load the simulation/preview UI on demand so it never ships with the engine.
+  // eslint-disable-next-line import/extensions
+  const { default: setupSimulation } = await import('./simulation.js');
+  setupSimulation(pluginOptions, document, SIMULATION_PANEL_REOPEN_KEY);
 }
