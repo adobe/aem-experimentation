@@ -1,3 +1,10 @@
+# [1.2.0](https://github.com/adobe/aem-experimentation/compare/v1.1.0...v1.2.0) (2026-07-23)
+
+
+### Features
+
+* load simulation panel UI in loadLazy (AEM Sidekick) ([#62](https://github.com/adobe/aem-experimentation/issues/62)) ([44828b6](https://github.com/adobe/aem-experimentation/commit/44828b65b6c074ade364ac757bce56e4d6b01c78)), closes [#61](https://github.com/adobe/aem-experimentation/issues/61) [#61](https://github.com/adobe/aem-experimentation/issues/61) [#61](https://github.com/adobe/aem-experimentation/issues/61)
+
 # [1.1.0](https://github.com/adobe/aem-experimentation/compare/v1.0.1...v1.1.0) (2026-02-18)
 
 
