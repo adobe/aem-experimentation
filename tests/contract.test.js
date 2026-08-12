@@ -59,4 +59,23 @@ test.describe('client ⇄ engine decision contract (#71)', () => {
     });
     expect(resolved).toEqual({ 'returning-visitor': true, 'new-visitor': false });
   });
+
+  test('rejects non-objects and invalid facets.', async ({ page }) => {
+    const result = await page.evaluate(() => ({
+      nullRes: window.contract.isDecisionResponse(null),
+      stringRes: window.contract.isDecisionResponse('nope'),
+      arrayRes: window.contract.isDecisionResponse([]),
+      badAssignments: window.contract.isDecisionResponse({ assignments: { exp: 123 } }),
+      badDecision: window.contract.isDecisionResponse({ decisions: { '.x': { foo: 'bar' } } }),
+      badDecisionsType: window.contract.isDecisionResponse({ decisions: 'nope' }),
+    }));
+    expect(result).toEqual({
+      nullRes: false,
+      stringRes: false,
+      arrayRes: false,
+      badAssignments: false,
+      badDecision: false,
+      badDecisionsType: false,
+    });
+  });
 });

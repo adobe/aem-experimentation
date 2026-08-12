@@ -37,4 +37,14 @@ test.describe('getAssignment hook (#68)', () => {
     // No assignment → the plugin buckets itself; any known variant may show.
     expect(await page.locator('main').textContent()).toMatch(/Hello (World|v1|v2)!/);
   });
+
+  test('serves control when the engine assigns an unknown variant.', async ({ page }) => {
+    await goToAndRunExperiment(page, '/tests/fixtures/experiments/page-level--get-assignment-unknown');
+    expect(await page.locator('main').textContent()).toEqual('Hello World!');
+  });
+
+  test('falls back to self-bucketing when getAssignment throws.', async ({ page }) => {
+    await goToAndRunExperiment(page, '/tests/fixtures/experiments/page-level--get-assignment-error');
+    expect(await page.locator('main').textContent()).toMatch(/Hello (World|v1|v2)!/);
+  });
 });

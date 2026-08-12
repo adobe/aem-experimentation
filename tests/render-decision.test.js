@@ -36,4 +36,11 @@ test.describe('renderDecision hook (#70)', () => {
       selector: '.fragment',
     }]);
   });
+
+  test('falls back to control when renderDecision throws.', async ({ page }) => {
+    await goToAndRunAudience(page, '/tests/fixtures/audiences/page-level--render-decision-error');
+    // The renderer threw, so nothing is applied and the page keeps its content.
+    expect(await page.locator('main').textContent()).toContain('Hello World!');
+    expect(await page.locator('body').getAttribute('class')).toContain('audience-default');
+  });
 });

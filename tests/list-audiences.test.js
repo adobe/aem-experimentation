@@ -21,4 +21,19 @@ test.describe('listAudiences catalog seam', () => {
     // Only the registered audience is advertised; the catalog was never called.
     await expect(page.locator('body')).toHaveAttribute('data-audiences', 'foo');
   });
+
+  test('is a no-op in preview when no catalog hook is provided.', async ({ page }) => {
+    await page.goto('/tests/fixtures/audiences/page-level--catalog-none');
+    await expect(page.locator('body')).toHaveAttribute('data-audiences', 'foo');
+  });
+
+  test('leaves registered audiences untouched for an empty catalog.', async ({ page }) => {
+    await page.goto('/tests/fixtures/audiences/page-level--catalog-empty');
+    await expect(page.locator('body')).toHaveAttribute('data-audiences', 'foo');
+  });
+
+  test('keeps the page working when the catalog throws.', async ({ page }) => {
+    await page.goto('/tests/fixtures/audiences/page-level--catalog-error');
+    await expect(page.locator('body')).toHaveAttribute('data-audiences', 'foo');
+  });
 });
