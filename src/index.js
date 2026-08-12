@@ -216,9 +216,13 @@ export function getMetadata(name) {
 /**
  * Gets all the metadata elements that are in the given scope.
  * @param {String} scope The scope/prefix for the metadata
+ * @param {Function} keyFn Transforms each metadata key. Defaults to `toCamelCase`
+ *   (config props like `startDate`, `requiresConsent`); pass `toClassName` to
+ *   preserve multi-word *names* (audience/campaign names must stay class-name to
+ *   match the project config + resolution).
  * @returns a map of key/value pairs for the given scope
  */
-export function getAllMetadata(scope) {
+export function getAllMetadata(scope, keyFn = toCamelCase) {
   const value = getMetadata(scope);
   const metaTags = document.head.querySelectorAll(`meta[name^="${scope}"], meta[property^="${scope}:"]`);
   return [...metaTags].reduce((res, meta) => {
@@ -228,8 +232,7 @@ export function getAllMetadata(scope) {
         : meta.getAttribute('property').substring(scope.length + 1),
     );
 
-    const camelCaseKey = toCamelCase(key);
-    res[camelCaseKey] = meta.getAttribute('content');
+    res[keyFn(key)] = meta.getAttribute('content');
     return res;
   }, value ? { value } : {});
 }
@@ -611,8 +614,12 @@ async function applyAllModifications(
 
   const configs = [];
 
-  // Full-page modifications
-  const pageMetadata = getAllMetadata(type);
+  // Full-page modifications. Experiments key their metadata by camelCased config
+  // props (`startDate`, `requiresConsent`, …); audiences/campaigns key by
+  // audience/campaign *name*, which must stay class-name to match the project
+  // config + resolution (as section- and fragment-level already do).
+  const keyFn = type === pluginOptions.experimentsMetaTagPrefix ? toCamelCase : toClassName;
+  const pageMetadata = getAllMetadata(type, keyFn);
   const pageNS = await modificationsHandler(
     document.querySelector('main'),
     pageMetadata,
