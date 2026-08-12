@@ -376,6 +376,37 @@ async function replaceInner(path, el, selector) {
 }
 
 /**
+ * Applies a resolved decision to an element.
+ *
+ * By default this fetches the experience URL and swaps in its content (see
+ * `replaceInner`). When the project provides a `renderDecision` hook, that hook
+ * owns application instead — so an engine that returns JSON, a content
+ * reference or an external-CMS id can apply the decision however it is shaped.
+ * @param {Object} pluginOptions the plugin options
+ * @param {HTMLElement} el the target element
+ * @param {Object} decision the normalized decision
+ *   (`{ type, scope, url, selector?, config }`)
+ * @returns the served URL on success, or `null` if application failed
+ */
+async function applyDecision(pluginOptions, el, decision) {
+  if (typeof pluginOptions.renderDecision === 'function') {
+    try {
+      await pluginOptions.renderDecision(el, decision);
+      return decision.url;
+    } catch (e) {
+      // eslint-disable-next-line no-console
+      console.log('error rendering decision:', decision, e);
+      return null;
+    }
+  }
+  return replaceInner(
+    new URL(decision.url, window.location.origin).pathname,
+    el,
+    decision.selector,
+  );
+}
+
+/**
  * Checks if any of the configured audiences on the page can be resolved.
  * @param {String[]} pageAudiences a list of configured audiences for the page
  * @param {Object} options the plugin options
@@ -497,7 +528,12 @@ function createModificationsHandler(
         return;
       }
       // eslint-disable-next-line no-await-in-loop
-      res = await replaceInner(new URL(url, window.location.origin).pathname, el);
+      res = await applyDecision(pluginOptions, el, {
+        type,
+        scope: el.tagName === 'MAIN' ? 'page' : 'section',
+        url,
+        config: ns.config,
+      });
     } else {
       res = url;
     }
@@ -590,7 +626,13 @@ function watchMutationsAndApplyFragments(
       let res;
       if (url && new URL(url, window.location.origin).pathname !== window.location.pathname) {
         // eslint-disable-next-line no-await-in-loop
-        res = await replaceInner(new URL(url, window.location.origin).pathname, el, entry.selector);
+        res = await applyDecision(pluginOptions, el, {
+          type: ns,
+          scope: 'fragment',
+          url,
+          selector: entry.selector,
+          config: fragmentNS.config,
+        });
         // eslint-disable-next-line no-await-in-loop
         await pluginOptions.decorateFunction(el);
       } else {
