@@ -1350,8 +1350,11 @@ function setupCommunicationLayer(options) {
  * In preview/dev, enriches `body[data-audiences]` with the audiences advertised
  * by an optional `listAudiences()` catalog, so the simulation panel can
  * enumerate an engine's segments even when the project registers only a generic
- * remote resolver (enumeration ≠ decision). Author-time only; opt-in and a
- * no-op by default. See documentation/byo-decision-engine.md.
+ * remote resolver (enumeration ≠ decision).
+ *
+ * Called from `loadLazy` (the panel phase), never the eager/LCP path, and
+ * invoked fire-and-forget so a slow catalog can't stall panel setup. Author-time
+ * only; opt-in and a no-op by default. See documentation/byo-decision-engine.md.
  * @param {Document} doc the document
  * @param {Object} pluginOptions the plugin options
  */
@@ -1392,9 +1395,9 @@ export async function loadEager(document, options = {}) {
 
   // Register the (tiny, UI-less) simulation handshake as early as possible so
   // an eagerly-injected Sidekick bookmarklet doesn't race past it. Preview/dev
-  // only; the heavy panel UI is still deferred to loadLazy.
+  // only; the heavy panel UI — and the audience catalog it needs — are deferred
+  // to loadLazy so they never touch the eager/LCP path.
   if (isDebugEnabled) {
-    await registerCatalogAudiences(document, pluginOptions);
     setupCommunicationLayer(pluginOptions);
   }
 }
@@ -1434,6 +1437,12 @@ export async function loadLazy(document, options = {}) {
   // Ensure the postMessage handshake is available even on preview pages that had
   // no experiment configured when loadEager ran. No-op if already registered.
   setupCommunicationLayer(pluginOptions);
+
+  // Advertise the engine's audience catalog to the panel's switcher. This only
+  // feeds the (lazily-opened) simulation UI, so it lives here — never in the
+  // eager/LCP path — and is fire-and-forget so a slow catalog can't stall the
+  // panel. registerCatalogAudiences swallows its own errors.
+  registerCatalogAudiences(document, pluginOptions);
 
   // Load the simulation/preview UI on demand so it never ships with the engine.
   // eslint-disable-next-line import/extensions

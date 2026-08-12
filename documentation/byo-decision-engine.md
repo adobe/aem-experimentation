@@ -187,8 +187,10 @@ loadEager(document, {
 });
 ```
 
-Preview/dev only, opt-in, and never fetched in production. The returned names
-are merged into `body[data-audiences]`, which the panel enumerates from.
+Preview/dev only, opt-in, and never fetched in production. It runs in the lazy
+phase alongside the panel — never in the eager/LCP path — so it can't slow down
+the page. The returned names are merged into `body[data-audiences]`, which the
+panel enumerates from.
 
 ## The client ⇄ engine contract
 
