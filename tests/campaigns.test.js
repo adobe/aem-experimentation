@@ -50,6 +50,11 @@ test.describe('Page-level campaigns', () => {
     expect(await page.locator('main').textContent()).toContain('Hello v2!');
   });
 
+  test('Supports a multi-word campaign name.', async ({ page }) => {
+    await goToAndRunCampaign(page, '/tests/fixtures/campaigns/page-level--hyphenated?campaign=black-friday');
+    expect(await page.locator('main').textContent()).toContain('Hello v1!');
+  });
+
   test('Ignores invalid campaigns references in the query parameters.', async ({ page }) => {
     await goToAndRunCampaign(page, '/tests/fixtures/campaigns/page-level?campaign=baz');
     expect(await page.locator('main').textContent()).toContain('Hello World!');

@@ -101,6 +101,11 @@ test.describe('Page-level audiences', () => {
     );
   });
 
+  test('Supports a multi-word audience name.', async ({ page }) => {
+    await goToAndRunAudience(page, '/tests/fixtures/audiences/page-level--hyphenated');
+    expect(await page.locator('main').textContent()).toContain('Hello v1!');
+  });
+
   test('triggers a DOM event with the audience detail', async ({ page }) => {
     const fn = await waitForDomEvent(page, 'aem:experimentation');
     await page.goto('/tests/fixtures/audiences/page-level');
