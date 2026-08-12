@@ -1,3 +1,10 @@
+## [1.2.2](https://github.com/adobe/aem-experimentation/compare/v1.2.1...v1.2.2) (2026-08-12)
+
+
+### Bug Fixes
+
+* resolve multi-word audience/campaign names at page level ([#65](https://github.com/adobe/aem-experimentation/issues/65)) ([3fa2579](https://github.com/adobe/aem-experimentation/commit/3fa2579ac5e2bb0c638e0a8a5a2af90ba48c059d))
+
 ## [1.2.1](https://github.com/adobe/aem-experimentation/compare/v1.2.0...v1.2.1) (2026-08-12)
 
 
