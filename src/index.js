@@ -407,13 +407,31 @@ async function applyDecision(pluginOptions, el, decision) {
 }
 
 /**
+ * Builds the shared context handed to the batched decision hooks
+ * (`resolveAudiences`, `getAssignment`). The client provides what it can know
+ * authoritatively; a worker/engine enriches it server-side (e.g. `visitorId`
+ * from the cookie, `geo` from the edge). See documentation/byo-decision-engine.md.
+ * @returns {{ url: string, consent: boolean }} the decision context
+ */
+function getDecisionContext() {
+  return {
+    url: window.location.href,
+    consent: isUserConsentGiven(),
+  };
+}
+
+/**
  * Checks if any of the configured audiences on the page can be resolved.
  * @param {String[]} pageAudiences a list of configured audiences for the page
  * @param {Object} options the plugin options
  * @returns Returns the names of the resolved audiences, or `null` if no audience is configured
  */
 export async function getResolvedAudiences(pageAudiences, options) {
-  if (!pageAudiences.length || !Object.keys(options.audiences).length) {
+  const hasResolver = typeof options.resolveAudiences === 'function';
+  // A batched resolver can answer audiences without a per-audience registry, so
+  // only bail when there is neither a resolver nor a configured `audiences` map.
+  if (!pageAudiences.length
+    || (!hasResolver && !Object.keys(options.audiences).length)) {
     return null;
   }
   // If we have a forced audience set in the query parameters (typically for simulation purposes)
@@ -426,7 +444,20 @@ export async function getResolvedAudiences(pageAudiences, options) {
     return pageAudiences.includes(forcedAudience) ? [forcedAudience] : [];
   }
 
-  // Otherwise, return the list of audiences that are resolved on the page
+  // A batched, context-aware resolver answers every audience in one call.
+  if (hasResolver) {
+    try {
+      const resolved = await options.resolveAudiences(pageAudiences, getDecisionContext());
+      return pageAudiences.filter((name) => resolved && resolved[name]);
+    } catch (e) {
+      // A rejection (or a helper timeout) falls back to control rather than
+      // blocking render indefinitely.
+      debug('resolveAudiences failed; serving control', e);
+      return [];
+    }
+  }
+
+  // Otherwise, resolve each configured audience independently.
   const results = await Promise.all(
     pageAudiences
       .map((key) => {
@@ -437,6 +468,61 @@ export async function getResolvedAudiences(pageAudiences, options) {
       }),
   );
   return pageAudiences.filter((_, i) => results[i]);
+}
+
+/**
+ * Builds a batched, memoized `resolveAudiences` implementation that delegates to
+ * a remote endpoint (typically the auth-proxy worker — see examples/). It hides
+ * the common glue: one request per page, a timeout, and a control fallback so a
+ * slow or failing engine never blocks render.
+ *
+ * The endpoint receives `POST { names, context }` and answers with the audience
+ * resolution shape from the contract — `{ audiences: { [name]: boolean } }` (a
+ * bare `{ [name]: boolean }` map is also accepted).
+ *
+ * @param {Object} options
+ * @param {String} options.endpoint the URL to resolve audiences against
+ * @param {Number} [options.timeout=1000] milliseconds before serving control
+ * @param {Object} [options.fetchOptions] extra options merged into the `fetch` call
+ * @returns {Function} a `resolveAudiences(names, context)` implementation
+ */
+export function createRemoteAudienceResolver(options = {}) {
+  const { endpoint, timeout = 1000, fetchOptions = {} } = options;
+  const cache = new Map();
+  return (names, context) => {
+    const key = `${context && context.url ? context.url : ''}::${[...names].sort().join(',')}`;
+    if (!cache.has(key)) {
+      const controller = new AbortController();
+      const request = fetch(endpoint, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ names, context }),
+        signal: controller.signal,
+        ...fetchOptions,
+      })
+        .then((resp) => {
+          if (!resp.ok) {
+            throw new Error(`resolveAudiences endpoint returned ${resp.status}`);
+          }
+          return resp.json();
+        })
+        // Accept the contract envelope `{ audiences: {…} }` or a bare map.
+        .then((data) => data.audiences || data)
+        .catch((e) => {
+          debug('remote audience resolver failed; serving control', e);
+          return {};
+        });
+      // Time-box the request; on timeout, abort it and serve control.
+      const timedOut = new Promise((resolve) => {
+        setTimeout(() => {
+          controller.abort();
+          resolve({});
+        }, timeout);
+      });
+      cache.set(key, Promise.race([request, timedOut]));
+    }
+    return cache.get(key);
+  };
 }
 
 /**
