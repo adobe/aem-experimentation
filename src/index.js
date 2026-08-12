@@ -1346,6 +1346,35 @@ function setupCommunicationLayer(options) {
   });
 }
 
+/**
+ * In preview/dev, enriches `body[data-audiences]` with the audiences advertised
+ * by an optional `listAudiences()` catalog, so the simulation panel can
+ * enumerate an engine's segments even when the project registers only a generic
+ * remote resolver (enumeration ≠ decision). Author-time only; opt-in and a
+ * no-op by default. See documentation/byo-decision-engine.md.
+ * @param {Document} doc the document
+ * @param {Object} pluginOptions the plugin options
+ */
+async function registerCatalogAudiences(doc, pluginOptions) {
+  if (typeof pluginOptions.listAudiences !== 'function') {
+    return;
+  }
+  try {
+    const catalog = await pluginOptions.listAudiences();
+    const names = (Array.isArray(catalog) ? catalog : [])
+      .map((entry) => (typeof entry === 'string' ? entry : entry?.name))
+      .filter(Boolean);
+    if (!names.length) {
+      return;
+    }
+    const existing = stringToArray(doc.body.dataset.audiences || '');
+    // De-dupe while preserving order (registered audiences first).
+    doc.body.dataset.audiences = [...new Set([...existing, ...names])].join(',');
+  } catch (e) {
+    debug('listAudiences failed; simulation panel will show only registered audiences', e);
+  }
+}
+
 export async function loadEager(document, options = {}) {
   const pluginOptions = { ...DEFAULT_OPTIONS, ...options };
   setDebugMode(window.location, pluginOptions);
@@ -1365,6 +1394,7 @@ export async function loadEager(document, options = {}) {
   // an eagerly-injected Sidekick bookmarklet doesn't race past it. Preview/dev
   // only; the heavy panel UI is still deferred to loadLazy.
   if (isDebugEnabled) {
+    await registerCatalogAudiences(document, pluginOptions);
     setupCommunicationLayer(pluginOptions);
   }
 }
