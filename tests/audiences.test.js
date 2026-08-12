@@ -165,6 +165,11 @@ test.describe('Fragment-level audiences', () => {
     expect(await page.locator('.fragment').textContent()).toContain('Hello v1!');
   });
 
+  test('Supports a single audience per selector.', async ({ page }) => {
+    await goToAndRunAudience(page, '/tests/fixtures/audiences/fragment-level--single');
+    expect(await page.locator('.fragment').textContent()).toContain('Hello v1!');
+  });
+
   test('Ignores invalid manifest url.', async ({ page }) => {
     await goToAndRunAudience(page, '/tests/fixtures/audiences/fragment-level--invalid-url');
     expect(await page.locator('.fragment').textContent()).toContain('Hello World!');
