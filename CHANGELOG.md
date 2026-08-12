@@ -1,3 +1,10 @@
+## [1.2.1](https://github.com/adobe/aem-experimentation/compare/v1.2.0...v1.2.1) (2026-08-12)
+
+
+### Bug Fixes
+
+* support a single audience/campaign per selector in fragment manifests ([#63](https://github.com/adobe/aem-experimentation/issues/63)) ([6f7b3e8](https://github.com/adobe/aem-experimentation/commit/6f7b3e8c382dcbb5750d58025db2a46ccd6e612e))
+
 # [1.2.0](https://github.com/adobe/aem-experimentation/compare/v1.1.0...v1.2.0) (2026-07-23)
 
 
