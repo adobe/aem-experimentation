@@ -2,7 +2,7 @@
 
 - **Status:** Draft / RFC (for discussion — not a merge-ready change)
 - **Target branch:** `v2`
-- **Related:** #63 (fixes one of the bugs below)
+- **Related:** #63, #65 (merged — fix the two bugs below)
 
 ## Summary
 
@@ -57,6 +57,12 @@ client-side. That part was clean. Two areas were not.
    **Fixed in #65:** `getAllMetadata` takes an optional key transform, and
    `applyAllModifications` passes `toClassName` for audience/campaign page
    metadata while experiments keep `toCamelCase` (config readers unchanged).
+   Audiences and campaigns now read names by class-name at **every** level
+   (page/section/fragment); experiments stay on `toCamelCase` deliberately —
+   an experiment's name is a metadata *value*, not a key, and its multi-word
+   *keys* (`startDate`, `requiresConsent`, …) are config props that need it.
+   Folding all three behind a single normalized metadata read is the clean
+   end-state — see the decision-provider convergence under **Decisions**.
    *(Removes the need for hyphen-free tokens like `ixptreatment` at page level.)*
 
 ### B. Design gaps (the actual BYO enablers)
@@ -84,7 +90,9 @@ client-side. That part was clean. Two areas were not.
 5. **No exposure/tracking override.** The plugin fires its own RUM per type with
    no opt-out. A BYO engine already fires exposure server-side, so you get
    double counting, and the inline reporting doesn't apply. Proposed:
-   `tracking: 'off' | (event) => void`.
+   `rumTracking: 'off' | (event) => void`. (Custom tracking can also hook the
+   `aem:experimentation` DOM events the plugin already emits per decision;
+   `rumTracking` specifically governs the built-in RUM.)
 
 6. **No pluggable decision renderer.** Application is fetch-URL-then-`innerHTML`
    with a fixed `main > div` fallback. Engines return JSON, content refs, or
@@ -100,7 +108,7 @@ changes for existing users:
 |---|---|
 | `resolveAudiences(names, context)` | one batched, context-aware resolution |
 | `getAssignment(experimentId, context)` | delegate the split to an external engine |
-| `tracking` | disable or delegate exposure/conversion tracking |
+| `rumTracking` | disable or delegate the built-in RUM exposure tracking |
 | `renderDecision(el, decision)` | pluggable application of a decision |
 
 Plus a stable, versioned **client ⇄ engine contract** (the normalized decision
@@ -119,12 +127,17 @@ stop re-inventing the glue:
 - **Contract tests** that validate the decision shapes on both ends via shared
   fixtures.
 
+## Decisions
+
+- **Converge on one decision provider.** Audiences, campaigns, and experiments
+  resolve behind a single provider abstraction rather than three parallel
+  mechanisms. This is also where the bug-#2 metadata-name normalization folds
+  together cleanly for all three.
+- **Reference worker lives in this repo under `examples/`** (for now).
+
 ## Open questions
 
 - API surface + backward compatibility for the hooks.
-- Should audiences / campaigns / experiments converge behind one **decision
-  provider** abstraction, rather than three parallel mechanisms?
-- Where should the reference worker live (this repo `examples/`, or a companion)?
 
 ## Non-goals
 
