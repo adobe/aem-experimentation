@@ -47,17 +47,17 @@ client-side. That part was clean. Two areas were not.
    decision per slot). **Fixed in #63.**
 
 2. **Multi-word audience/campaign names don't resolve at page level.**
-   `getAllMetadata` camelCases metadata keys, so `audience-returning-visitor`
-   becomes `returningVisitor`. Downstream, names are matched/looked up in
+   `getAllMetadata` camelCased metadata keys, so `audience-returning-visitor`
+   became `returningVisitor`. Downstream, names are matched/looked up in
    class-name form, and `toClassName('returningVisitor')` → `returningvisitor`
-   (the word boundary is lost) — which matches neither the `returning-visitor`
-   project config key nor the camelCase one. Because the camelCasing is lossy,
-   this **cannot be fixed downstream** — it needs the metadata reader to
-   preserve the audience/campaign *name* (section- and fragment-level already
-   keep class-name keys and work). Flagged here rather than patched blindly
-   because the right fix touches shared `getAllMetadata` behavior and deserves a
-   design decision. *(This is why BYO integrations must currently use
-   hyphen-free tokens like `ixptreatment`.)*
+   (the word boundary is lost) — which matched neither the `returning-visitor`
+   project config key nor the camelCase one. The camelCasing is lossy, so it
+   couldn't be fixed downstream; the fix belonged at the metadata reader
+   (section- and fragment-level already keep class-name keys and work).
+   **Fixed in #65:** `getAllMetadata` takes an optional key transform, and
+   `applyAllModifications` passes `toClassName` for audience/campaign page
+   metadata while experiments keep `toCamelCase` (config readers unchanged).
+   *(Removes the need for hyphen-free tokens like `ixptreatment` at page level.)*
 
 ### B. Design gaps (the actual BYO enablers)
 
@@ -125,8 +125,6 @@ stop re-inventing the glue:
 - Should audiences / campaigns / experiments converge behind one **decision
   provider** abstraction, rather than three parallel mechanisms?
 - Where should the reference worker live (this repo `examples/`, or a companion)?
-- Fix direction for bug **#2** (preserve audience/campaign names in the metadata
-  reader without disturbing the camelCased *config* keys experiments rely on).
 
 ## Non-goals
 
