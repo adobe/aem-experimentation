@@ -923,11 +923,15 @@ function parseCampaignManifest(entries) {
   ))
     .map(aggregateEntries('campaign', ['campaign', 'url']))
     .map((e) => {
-      const campaigns = e.campaign;
+      // A selector with a single campaign leaves `campaign`/`url` as scalars
+      // (aggregateEntries only builds arrays for multi-value selectors), so
+      // normalize to arrays before iterating.
+      const campaigns = [].concat(e.campaign);
+      const urls = [].concat(e.url);
       delete e.campaign;
       e.campaigns = {};
       campaigns.forEach((a, i) => {
-        e.campaigns[toClassName(a)] = e.url[i];
+        e.campaigns[toClassName(a)] = urls[i];
       });
       delete e.url;
       return e;
@@ -1003,11 +1007,15 @@ function parseAudienceManifest(entries) {
   ))
     .map(aggregateEntries('audience', ['audience', 'url']))
     .map((e) => {
-      const audiences = e.audience;
+      // A selector with a single audience leaves `audience`/`url` as scalars
+      // (aggregateEntries only builds arrays for multi-value selectors), so
+      // normalize to arrays before iterating.
+      const audiences = [].concat(e.audience);
+      const urls = [].concat(e.url);
       delete e.audience;
       e.audiences = {};
       audiences.forEach((a, i) => {
-        e.audiences[toClassName(a)] = e.url[i];
+        e.audiences[toClassName(a)] = urls[i];
       });
       delete e.url;
       return e;

@@ -1,0 +1,11 @@
+{
+  "data": [
+      {
+          "Page": "/tests/fixtures/campaigns/fragment-level--single",
+          "Campaign": "Foo",
+          "Selector": ".fragment",
+          "Url": "/tests/fixtures/campaigns/variant-1"
+      }
+  ],
+  ":type": "sheet"
+}

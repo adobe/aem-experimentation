@@ -173,6 +173,11 @@ test.describe('Fragment-level campaigns', () => {
     expect(await page.locator('.fragment').textContent()).toContain('Hello v1!');
   });
 
+  test('Supports a single campaign per selector.', async ({ page }) => {
+    await goToAndRunCampaign(page, '/tests/fixtures/campaigns/fragment-level--single?campaign=foo');
+    expect(await page.locator('.fragment').textContent()).toContain('Hello v1!');
+  });
+
   test('Ignores invalid manifest url.', async ({ page }) => {
     await goToAndRunCampaign(page, '/tests/fixtures/campaigns/fragment-level--invalid-url?campaign=foo');
     expect(await page.locator('.fragment').textContent()).toContain('Hello World!');
