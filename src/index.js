@@ -841,6 +841,36 @@ function aggregateEntries(type, allowedMultiValuesProperties) {
 }
 
 /**
+ * Asks an external engine for the experiment assignment, so the arm comes from
+ * the engine rather than the plugin's client-side randomization.
+ * @param {Object} pluginOptions the plugin options
+ * @param {Object} config the experiment config (needs `id`)
+ * @param {String[]} variantNames the known variant names for the experiment
+ * @returns {Promise<String|null>} the variant to serve, or `null` to let the
+ *   plugin self-bucket (the engine declined or errored)
+ */
+async function getExternalAssignment(pluginOptions, config, variantNames) {
+  try {
+    const variant = await pluginOptions.getAssignment(config.id, getDecisionContext());
+    // A falsy answer means the engine does not own this experiment — self-bucket.
+    if (!variant) {
+      return null;
+    }
+    const normalized = toClassName(variant);
+    if (variantNames.includes(normalized)) {
+      return normalized;
+    }
+    // The engine assigned an arm we can't render; serve control rather than
+    // re-randomizing against its intent.
+    debug(`getAssignment returned unknown variant "${variant}" for "${config.id}"; serving control`);
+    return 'control';
+  } catch (e) {
+    debug('getAssignment failed; falling back to self-bucketing', e);
+    return null;
+  }
+}
+
+/**
  * Parses the experiment configuration from the metadata
  */
 async function getExperimentConfig(pluginOptions, metadata, overrides) {
@@ -976,10 +1006,19 @@ async function getExperimentConfig(pluginOptions, metadata, overrides) {
   } else if (overrides.variant && variantNames.includes(overrides.variant)) {
     config.selectedVariant = toClassName(overrides.variant);
   } else {
-    // eslint-disable-next-line import/extensions
-    const { ued } = await import('./ued.js');
-    const decision = ued.evaluateDecisionPolicy(toDecisionPolicy(config), {});
-    config.selectedVariant = decision.items[0].id;
+    // Let an external engine own the assignment (skip randomization) before
+    // falling back to the plugin's own client-side bucketing.
+    const assigned = typeof pluginOptions.getAssignment === 'function'
+      ? await getExternalAssignment(pluginOptions, config, variantNames)
+      : null;
+    if (assigned) {
+      config.selectedVariant = assigned;
+    } else {
+      // eslint-disable-next-line import/extensions
+      const { ued } = await import('./ued.js');
+      const decision = ued.evaluateDecisionPolicy(toDecisionPolicy(config), {});
+      config.selectedVariant = decision.items[0].id;
+    }
   }
 
   return config;
