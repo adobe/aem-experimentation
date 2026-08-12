@@ -55,6 +55,20 @@ export const DEFAULT_OPTIONS = {
   // - 'universal-editor': the panel is delivered as a UE extension, so stay out of the way
   // - false: do not load any simulation UI
   simulationUI: 'auto',
+
+  // Bring-your-own decision engine hooks — all opt-in. When unset, the plugin
+  // keeps deciding, rendering and reporting exactly as before (no behavior
+  // change). See documentation/byo-decision-engine.md.
+  // - resolveAudiences: async (names, context) => ({ [name]: boolean })
+  //     one batched, context-aware audience resolution instead of N calls
+  // - getAssignment: async (experimentId, context) => variant
+  //     delegate the experiment split to an external engine (skip randomization)
+  // - rumTracking: 'off' | ((event) => void)
+  //     disable ('off') or delegate (function) the built-in RUM exposure tracking
+  // - renderDecision: async (el, decision) => { … }
+  //     apply a decision however it is shaped (JSON, content ref, DOM patch)
+  // - listAudiences: async () => Array<{ name, label? }>
+  //     enumerate the audience universe for the simulation panel (author-time)
 };
 
 const CONSENT_STORAGE_KEY = 'experimentation-consented';
@@ -160,6 +174,13 @@ export function updateUserConsent(consented) {
  * @param {string} result - the URL of the served experience.
  */
 function fireRUM(type, config, pluginOptions, result) {
+  const { rumTracking } = pluginOptions;
+  // Opt-out: a BYO engine that already fires exposure server-side disables the
+  // built-in RUM to avoid double counting.
+  if (rumTracking === 'off') {
+    return;
+  }
+
   const { selectedCampaign = 'default', selectedAudience = 'default' } = config;
 
   const typeHandlers = {
@@ -180,7 +201,13 @@ function fireRUM(type, config, pluginOptions, result) {
   const { source, target } = typeHandlers[type]();
   const rumType = type === 'experiment' ? 'experiment' : 'audience';
   onPageActivation(() => {
-    window.hlx?.rum?.sampleRUM(rumType, { source, target });
+    // Delegate to a custom sink when a function is provided, otherwise fire the
+    // built-in RUM. Same payload either way.
+    if (typeof rumTracking === 'function') {
+      rumTracking({ type: rumType, source, target });
+    } else {
+      window.hlx?.rum?.sampleRUM(rumType, { source, target });
+    }
   });
 }
 

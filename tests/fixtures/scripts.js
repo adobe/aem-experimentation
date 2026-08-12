@@ -66,7 +66,13 @@ async function loadEager(doc) {
     || [...document.querySelectorAll('.section-metadata div')].some((d) => d.textContent.match(/Experiment|Campaign|Audience/i))) {
     // eslint-disable-next-line import/no-absolute-path, import/no-unresolved
     const { loadEager: runEager } = await import('/src/index.js');
-    await runEager(document, { audiences: window.AUDIENCES || {} });
+    // `window.PLUGIN_OPTIONS` lets a fixture pass the BYO hooks (resolveAudiences,
+    // getAssignment, rumTracking, renderDecision, …) into loadEager. It spreads
+    // after `audiences`, so it stays a no-op ({}) for every existing fixture.
+    await runEager(document, {
+      audiences: window.AUDIENCES || {},
+      ...(window.PLUGIN_OPTIONS || {}),
+    });
   }
 
   const main = doc.querySelector('main');
