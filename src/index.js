@@ -37,6 +37,7 @@ export const DEFAULT_OPTIONS = {
   audiences: {},
   audiencesMetaTagPrefix: 'audience',
   audiencesQueryParameter: 'audience',
+  audienceAepPrefix: 'aep',
 
   // Campaigns related properties
   campaignsMetaTagPrefix: 'campaign',
@@ -374,6 +375,16 @@ export async function getResolvedAudiences(pageAudiences, options) {
       .map((key) => {
         if (options.audiences[key] && typeof options.audiences[key] === 'function') {
           return options.audiences[key]();
+        }
+        if (!options.audiences[key] && key.startsWith(`${options.audienceAepPrefix}-`)) {
+          const rtcdpSegmentId = key.replace(`${options.audienceAepPrefix}-`, '');
+          return import('./aep.js')
+            .then(({ getSegmentsFromAlloy }) => getSegmentsFromAlloy(options.aepConfig))
+            .then((segments) => {
+              console.log('segments', segments);
+              console.log('segment id', rtcdpSegmentId);
+              return segments.includes(rtcdpSegmentId);
+            });
         }
         return false;
       }),
