@@ -10,6 +10,12 @@
  * governing permissions and limitations under the License.
  */
 
+/**
+ * Set isDebugEnabled accordingly based on the URL and plugin options.
+ * @param {Object} url window.location
+ * @param {Object} pluginOptions with default options and custom options
+ * @returns {Boolean} whether debug mode is enabled
+ */
 let isDebugEnabled;
 export function setDebugMode(url, pluginOptions) {
   const { host, hostname, origin } = url;
@@ -31,6 +37,12 @@ export function debug(...args) {
 
 export const VERSION = '2.0.0';
 
+/**
+ * Default options for the plugin.
+ * could be extended and overridden by passing custom options
+ * e.g. 'abtest' instead of 'experiment'
+ * by passing { experimentsMetaTagPrefix: 'abtest' } in custom options
+ */
 export const DEFAULT_OPTIONS = {
 
   // Audiences related properties
@@ -315,10 +327,11 @@ function getAllSectionMeta(block, scope) {
 }
 
 /**
- * Replaces element with content from path
- * @param {String} path
- * @param {HTMLElement} el
- * @return Returns the path that was loaded or null if the loading failed
+ * Replaces the inner content of an element with content from a specified path.
+ * @param {String} path - the url path to load the content from
+ * @param {HTMLElement} el - the element to replace the content of
+ * @param {String} selector - taget CSS selector for fragment replacement
+ * @return The path that was loaded or null if the loading failed
  */
 async function replaceInner(path, el, selector) {
   try {
@@ -646,6 +659,7 @@ async function applyAllModifications(
       }
     }));
 
+  // Fragment-level modifications
   if (pageMetadata.manifest) {
     let entries = await getManifestEntriesForCurrentPage(pageMetadata.manifest);
     if (entries) {
@@ -667,6 +681,12 @@ async function applyAllModifications(
   return configs;
 }
 
+/**
+ * Aggregates the entries into a single object.
+ * @param {String} type experiment, campaign or audience
+ * @param {String[]} allowedMultiValuesProperties properties that can have multiple values
+ * @returns object with the aggregated entries
+ */
 function aggregateEntries(type, allowedMultiValuesProperties) {
   return (entries) => entries.reduce((aggregator, entry) => {
     Object.entries(entry).forEach(([key, value]) => {
@@ -831,7 +851,9 @@ async function getExperimentConfig(pluginOptions, metadata, overrides) {
 }
 
 /**
- * Parses the campaign manifest.
+ * Parses the experiemnt manifest
+ * @param {Object} entries fragment manifest entries
+ * @returns {Object} parsed fragment manifest that grouped by experiment
  */
 function parseExperimentManifest(entries) {
   return Object.values(Object.groupBy(
@@ -846,6 +868,12 @@ function getUrlFromExperimentConfig(config) {
     : null;
 }
 
+/**
+ * Runs the experiment on page/section/fragment.
+ * Page and Section level modifications are applied immediately,
+ * while fragment level modifications will be watched by observer.
+ * And dispatches custom events for further handling if needed.
+ */
 async function runExperiment(document, pluginOptions) {
   return applyAllModifications(
     pluginOptions.experimentsMetaTagPrefix,
@@ -951,6 +979,12 @@ function getUrlFromCampaignConfig(config) {
     : null;
 }
 
+/**
+ * Runs the campaign on page/section/fragment.
+ * Page and Section level modifications are applied immediately,
+ * while fragment level modifications will be watched by observer.
+ * And dispatches custom events for further handling if needed.
+ */
 async function runCampaign(document, pluginOptions) {
   return applyAllModifications(
     pluginOptions.campaignsMetaTagPrefix,
@@ -1035,6 +1069,12 @@ function getUrlFromAudienceConfig(config) {
     : null;
 }
 
+/**
+ * Serves the audience on page/section/fragment.
+ * Page and Section level modifications are applied immediately,
+ * while fragment level modifications will be watched by observer.
+ * And dispatches custom events for further handling if needed.
+ */
 async function serveAudience(document, pluginOptions) {
   document.body.dataset.audiences = Object.keys(pluginOptions.audiences).join(',');
   return applyAllModifications(
@@ -1152,6 +1192,11 @@ function setupCommunicationLayer(options) {
   });
 }
 
+/**
+ * Loads and initializes plugins and functionalities eagerly,
+ * @param {Document} document  The HTML document to be processed
+ * @param {Object} [options={}] Custom options passed from customer
+ */
 export async function loadEager(document, options = {}) {
   const pluginOptions = { ...DEFAULT_OPTIONS, ...options };
   setDebugMode(window.location, pluginOptions);
