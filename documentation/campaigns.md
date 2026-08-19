@@ -57,6 +57,16 @@ If you wanted to additionally restrict the campaign to specific audiences, so th
 If any of the listed audiences is resolved, then the campaign will run and the matching content will be served.
 If you needed both audiences to be resolved, you'd define a new `mobile-iphone` audience in your project and use that in the metadata instead.
 
+#### Page Redirect
+
+If you aim to fully direct a campaign page to a target URL instead of just replacing the content, you can do so by adding the `Campaign Resolution | redirect` property to the page metadata:
+
+| Metadata             |                                                                 |
+|----------------------|-----------------------------------------------------------------|
+| Campaign: Xmas       | [https://{ref}--{repo}--{org}.hlx.page/my-page-for-xmas]()      |
+| Campaign: Halloween  | [https://{ref}--{repo}--{org}.hlx.page/my-page-for-halloween]() |
+| Campaign Resolution  | redirect                                                        |
+
 ### Section-level audiences
 
 Each section in a page can also run any number of campaigns. Section-level campaigns are run after the page-level campaigns have run, i.e. after the variants have been processed and their markup was pulled into the main page, so the section-level campaigns that will run are dictated by the document from the current page-level experiment/audience/campaign, and not necessarily just the main page.

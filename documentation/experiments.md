@@ -83,7 +83,7 @@ To customize the labels, add a new entry in the page metadata or section metadat
 |---------------------|--------------------------------------------------------------|
 | Experiment          | Hero Test                                                    |
 | Experiment Variants | [https://{ref}--{repo}--{org}.hlx.page/my-page-variant-1](), [https://{ref}--{repo}--{org}.hlx.page/my-page-variant-2](), [https://{ref}--{repo}--{org}.hlx.page/my-page-variant-3]() |
-| Experiment Names    |  foo1, foo2, foo3                                                 |
+| Experiment Variant Names    |  foo1, foo2, foo3                                                 |
 
 The names defined will match with the corresponding variants in sequence. If the number of names provided is less than the number of variants, the default naming will be applied for the remaining variants.
 
@@ -128,6 +128,124 @@ Start and end dates are in the flexible JS [Date Time String Format](https://tc3
 
 So you can both use generic dates, like `2024-01-31` or `2024/01/31`, and time-specific dates like `2024-01-31T13:37` or `2024/01/31 1:37 pm`. You can even enforce a specific timezone so your experiment activates when, say, it's 2am GMT+1 by using `2024/1/31 2:00 pm GMT+1` or similar notations.
 
+#### Consent-based experiments
+
+For compliance with privacy regulations like GDPR, CCPA, and others, experiments can be configured to require user consent before running. This ensures that personalization and experimentation only occur when users have explicitly agreed to it.
+
+##### Enabling consent requirement
+
+To require consent for an experiment, add the `Experiment Requires Consent` metadata property:
+
+| Metadata              |                                                              |
+|-----------------------|--------------------------------------------------------------|
+| Experiment            | Hero Test                                                    |
+| Experiment Variants   | [https://{ref}--{repo}--{org}.hlx.page/my-page-variant-1](), [https://{ref}--{repo}--{org}.hlx.page/my-page-variant-2]() |
+| Experiment Requires Consent | true                                                   |
+
+When this property is set to `true`, the experiment will only run if the user has provided consent for experimentation. If set to `false` or omitted, the experiment will run according to its other configuration rules (existing behavior).
+
+##### Managing consent status
+
+The experimentation runtime provides JavaScript APIs to manage user consent:
+
+**Check current consent status:**
+```javascript
+import { isUserConsentGiven } from './path/to/experimentation/src/index.js';
+
+const isConsented = isUserConsentGiven();
+console.log('User has consented to experimentation:', isConsented);
+```
+
+**Update consent status:**
+```javascript
+import { updateUserConsent } from './path/to/experimentation/src/index.js';
+
+// Update consent (call this when your CMP sends a consent event)
+updateUserConsent(true);  // or false to revoke consent
+```
+
+##### Integrating with consent management platforms
+
+Connect your consent management system (CMS) to track user consent. Call `updateUserConsent` when your CMS sends a consent event.
+
+> **💡 Tip**: For cleaner code organization, we recommend placing consent integration in your `experiment-loader.js` file (if you have one) rather than in `scripts.js`. This keeps all experimentation-related code together. See the [README](/README.md#consent-management) for complete implementation examples.
+
+**Example: OneTrust integration**
+```javascript
+import { updateUserConsent } from './path/to/experimentation/src/index.js';
+
+function handleOneTrustConsent() {
+  const activeGroups = window.OnetrustActiveGroups || '';
+  const hasConsent = activeGroups.includes('C0003') // Functional Cookies
+    || activeGroups.includes('C0004'); // Targeting Cookies
+  updateUserConsent(hasConsent);
+}
+
+// Hook into OneTrust callback
+window.OptanonWrapper = function() {
+  handleOneTrustConsent();
+};
+```
+
+**Example: Cookiebot integration**
+```javascript
+import { updateUserConsent } from './path/to/experimentation/src/index.js';
+
+function handleCookiebotConsent() {
+  const preferences = window.Cookiebot?.consent?.preferences || false;
+  const marketing = window.Cookiebot?.consent?.marketing || false;
+  updateUserConsent(preferences || marketing);
+}
+
+window.addEventListener('CookiebotOnConsentReady', handleCookiebotConsent);
+window.addEventListener('CookiebotOnAccept', handleCookiebotConsent);
+```
+
+**Example: Custom consent banner**
+```javascript
+import { updateUserConsent } from './path/to/experimentation/src/index.js';
+
+// When user accepts/rejects consent
+function onConsentChange(accepted) {
+  updateUserConsent(accepted);
+}
+```
+
+##### Storage mechanism
+
+Consent status is stored locally in the browser's `localStorage` under the key `experimentation-consented`. This ensures consent preferences persist across browser sessions while remaining privacy-compliant by staying local to the user's device.
+
+##### Behavior when consent is required but not given
+
+- Experiments requiring consent will not run if consent has not been provided
+- The control experience (original page content) will be served
+- No RUM events related to the skipped experiment will be fired
+- The experiment configuration will still be available programmatically, but `config.run` will be `false`
+
+##### Best practices
+
+1. **Obtain consent early**: Implement consent collection as early as possible in the user journey
+2. **Respect consent changes**: Re-evaluate running experiments when consent status changes
+3. **Provide clear opt-out**: Ensure users can easily revoke consent if previously given
+4. **Document consent requirements**: Clearly indicate which experiments require consent in your authoring guidelines
+
+#### Redirect page experiments
+For the use case that fully redirect to the target URL instead of just replacing the content (our default behavior), you could add a new property `Experiment Resolution | redirect` in page metadata:
+| Metadata              |                                                              |
+|-----------------------|--------------------------------------------------------------|
+| Experiment            | Hero Test                                                    |
+| Experiment Variants   | [https://{ref}--{repo}--{org}.hlx.page/my-page-variant-1](), [https://{ref}--{repo}--{org}.hlx.page/my-page-variant-2](), [https://{ref}--{repo}--{org}.hlx.page/my-page-variant-3]() |
+| Experiment Resolution     | redirect
+
+In this example, the Hero Test experiment will redirect to one of the specified URLs based on the selected variant.
+
+Similarly, the redirects for audience personalization and campaign personalization could be enabled by adding:
+
+`Audience Resolution | redirect`
+`Campaign Resolution | redirect`
+
+For more details, refer to: [audiences](./audiences.md#page-redirect), [campaigns](./campaigns.md#page-redirect)
+
 ### Section-level experiments
 
 Each section in a page can also run 1 experiment, so you can have as many section-level experiments as you have sections.
@@ -164,11 +282,17 @@ The same spreadsheet can also contain the configuration for several pages at onc
 
 ### Simulation
 
-Once all of this is set up, authors will have access to an overlay on `localhost` and on the stage environments (i.e. `*.hlx.stage`) that lets them see what experiment and variants have been configured for the page and switch between each to visualize the content variations accordingly.
+> **Note:** the screenshot below and the "overlay pill" reflect the v1 plugin. In v2 that overlay is
+> no longer injected by the plugin — the simulation panel is now delivered by the
+> [AEM Sidekick extension](https://chromewebstore.google.com/detail/aem-sidekick/igkmdomcgoebiipaifhmpfjhbjccggml)
+> and loaded by the plugin's `loadLazy()`. See
+> [Enabling the simulation panel](../README.md#enabling-the-simulation-panel-aem-sidekick) in the main README.
+
+Once all of this is set up, authors will have access, in preview/development environments, to a panel that lets them see what experiment and variants have been configured for the page and switch between each to visualize the content variations accordingly.
 
 ![audience overlay](./images/experiments-overlay.png)
 
-The simulation capabilities leverage the `audience` query parameter that is appended to the URL and forcibly let you see the specific content variant.
+The simulation capabilities leverage the `experiment` query parameter (`?experiment=<experiment-id>/<variant-name>`, e.g. `?experiment=hero-test/challenger-1`) that is appended to the URL and forcibly let you see the specific content variant.
 
 ### Inline Reporting
 

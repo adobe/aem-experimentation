@@ -5,9 +5,9 @@
 With audiences you can serve different versions of your content to different groups of users based on the information you can glean from there current session. For instance, you can optimize the experience for:
 - mobile vs. desktop
 - Chrome vs. Firefox
-- 1st vs. returning visitor
-- fast vs slow connections
-- different geographies
+- [1st vs. returning visitor](https://github.com/hlxsites/wknd/blob/main/scripts/scripts.js#L33-L34)
+- [fast vs slow connections](https://developer.mozilla.org/en-US/docs/Web/API/NetworkInformation/effectiveType)
+- different geographies via [Geolocation API](https://github.com/hlxsites/wknd/blob/main/scripts/scripts.js#L33-L34) or CDN workers ([Fastly](https://www.fastly.com/documentation/reference/vcl/variables/geolocation/), [Cloudflare](https://developers.cloudflare.com/workers/examples/geolocation-hello-world/))
 - etc.
 
 ## Set up
@@ -69,6 +69,16 @@ The audiences are set up directly in the page metadata block as follows:
 | Audience: Desktop | [https://{ref}--{repo}--{org}.hlx.page/my-page-for-desktop]() |
 
 The notation is pretty flexible and authors can also use `Audience (Mobile)` or `Audience Mobile` if this is a preferred notation.
+
+#### Page redirect
+
+If you aim to direct your audience to a target URL instead of just replacing the content, you can do so by adding the `Audience Resolution | redirect` property to the page metadata:
+
+| Metadata            |                                                               |
+|---------------------|---------------------------------------------------------------|
+| Audience: Mobile    | [https://{ref}--{repo}--{org}.hlx.page/my-page-for-mobile]()  |
+| Audience: Desktop   | [https://{ref}--{repo}--{org}.hlx.page/my-page-for-desktop]() |
+| Audience Resolution | redirect                                                      |
 
 ### Section-level audiences
 

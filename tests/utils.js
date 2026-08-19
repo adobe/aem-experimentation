@@ -30,5 +30,5 @@ export async function waitForDomEvent(page, eventName) {
       document.addEventListener(name, (ev) => resolve(ev.detail));
     });
   }, eventName);
-  return async () => await window.eventPromise;
+  return async () => window.eventPromise;
 }

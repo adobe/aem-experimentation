@@ -1,0 +1,11 @@
+{
+  "data": [
+      {
+          "Page": "/tests/fixtures/audiences/fragment-level--single",
+          "Audience": "Foo",
+          "Selector": ".fragment",
+          "Url": "/tests/fixtures/audiences/variant-1"
+      }
+  ],
+  ":type": "sheet"
+}

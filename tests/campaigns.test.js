@@ -50,6 +50,11 @@ test.describe('Page-level campaigns', () => {
     expect(await page.locator('main').textContent()).toContain('Hello v2!');
   });
 
+  test('Supports a multi-word campaign name.', async ({ page }) => {
+    await goToAndRunCampaign(page, '/tests/fixtures/campaigns/page-level--hyphenated?campaign=black-friday');
+    expect(await page.locator('main').textContent()).toContain('Hello v1!');
+  });
+
   test('Ignores invalid campaigns references in the query parameters.', async ({ page }) => {
     await goToAndRunCampaign(page, '/tests/fixtures/campaigns/page-level?campaign=baz');
     expect(await page.locator('main').textContent()).toContain('Hello World!');
@@ -72,6 +77,24 @@ test.describe('Page-level campaigns', () => {
         source: 'foo',
         target: 'foo:bar',
       }),
+    ]);
+  });
+
+  test('Track RUM is fired before redirect.', async ({ page }) => {
+    const rumCalls = [];
+    await page.exposeFunction('logRumCall', (...args) => rumCalls.push(args));
+    await page.addInitScript(() => {
+      window.hlx = { rum: { sampleRUM: (...args) => window.logRumCall(args) } };
+    });
+    await page.goto('/tests/fixtures/campaigns/page-level--redirect?campaign=bar');
+    await page.waitForURL('/tests/fixtures/campaigns/variant-2');
+    expect(await page.evaluate(() => window.document.body.innerText)).toEqual('Hello v2!');
+    expect(rumCalls[0]).toContainEqual([
+      'audience',
+      {
+        source: 'bar',
+        target: 'foo:bar',
+      },
     ]);
   });
 
@@ -152,6 +175,11 @@ test.describe('Fragment-level campaigns', () => {
 
   test('Supports plural format for manifest keys.', async ({ page }) => {
     await goToAndRunCampaign(page, '/tests/fixtures/campaigns/fragment-level--alt?campaign=foo');
+    expect(await page.locator('.fragment').textContent()).toContain('Hello v1!');
+  });
+
+  test('Supports a single campaign per selector.', async ({ page }) => {
+    await goToAndRunCampaign(page, '/tests/fixtures/campaigns/fragment-level--single?campaign=foo');
     expect(await page.locator('.fragment').textContent()).toContain('Hello v1!');
   });
 
