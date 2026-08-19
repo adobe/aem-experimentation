@@ -29,7 +29,7 @@ export function debug(...args) {
   }
 }
 
-export const VERSION = '1.2.2';
+export const VERSION = '2.0.0';
 
 export const DEFAULT_OPTIONS = {
 

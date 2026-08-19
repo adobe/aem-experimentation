@@ -1,3 +1,20 @@
+# [2.0.0](https://github.com/adobe/aem-experimentation/compare/v1.2.2...v2.0.0) (2026-08-19)
+
+
+### Features
+
+* promote v2 to the 2.0.0 mainline ([22d3cd5](https://github.com/adobe/aem-experimentation/commit/22d3cd5a3883df9d613b3ac6ce445008c8fbb1b5))
+
+
+### BREAKING CHANGES
+
+* the mainline is now the former v2 codebase, with support
+for multiple experiments, audiences and campaigns per page. Consumers
+pinned to the 1.x API should track the `v1` branch. This begins the 2.0.0
+release line.
+
+Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>
+
 ## [1.2.2](https://github.com/adobe/aem-experimentation/compare/v1.2.1...v1.2.2) (2026-08-12)
 
 
