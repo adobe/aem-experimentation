@@ -1,0 +1,14 @@
+name = "aem-experimentation-auth-proxy"
+main = "src/cloudflare.js"
+compatibility_date = "2024-09-01"
+
+# The reference worker runs standalone against a bundled stub engine, so it
+# needs no configuration to try out (`npx wrangler dev`).
+#
+# To wire it to a real engine, set the URL as a var and the API key as a
+# secret (never commit the key):
+#
+#   wrangler secret put ENGINE_API_KEY
+#
+# [vars]
+# ENGINE_URL = "https://engine.example.com/decide"

@@ -1,0 +1,15 @@
+{
+  "name": "aem-experimentation-auth-proxy",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Reference auth-proxy worker for a bring-your-own decision engine integration with @adobe/aem-experimentation.",
+  "main": "src/cloudflare.js",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy"
+  },
+  "devDependencies": {
+    "wrangler": "^3.0.0"
+  }
+}

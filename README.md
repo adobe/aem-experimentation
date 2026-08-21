@@ -236,6 +236,22 @@ const experimentationConfig = {
   // - 'universal-editor': the panel is delivered as a UE extension, so stay out of the way
   // - false: do not load any simulation UI
   simulationUI: 'auto',
+
+  /* Bring-your-own decision engine hooks — all opt-in; omit them to keep the
+     plugin deciding, rendering and reporting exactly as before. See the
+     dedicated page linked below. */
+  // One batched, context-aware audience resolution instead of N per-audience calls:
+  resolveAudiences: async (names, context) => ({ /* [name]: boolean */ }),
+  // Delegate the experiment split to an external engine (skip randomization):
+  getAssignment: async (experimentId, context) => 'control',
+  // Resolve content per "decisions-manifest" slot in one batched call:
+  resolveDecisions: async (entries, context) => ({ /* [selector]: { url } */ }),
+  // Disable ('off') or delegate (a function) the built-in RUM exposure tracking:
+  rumTracking: 'off',
+  // Apply a decision however it is shaped (JSON, content ref, DOM patch):
+  renderDecision: async (el, decision) => { /* … */ },
+  // Enumerate the audience universe for the simulation panel (author-time):
+  listAudiences: async () => [{ name: 'returning-visitor', label: 'Returning visitor' }],
 };
 ```
 
@@ -243,6 +259,7 @@ For detailed implementation instructions on the different features, please read 
 - [Audiences](/documentation/audiences.md)
 - [Campaigns](/documentation/campaigns.md)
 - [Experiments](/documentation/experiments.md)
+- [Bring your own decision engine](/documentation/byo-decision-engine.md)
 
 **Cases of passing `decorationFunction`**
 Fragment replacement is handled by async observer, which may execute before or after default decoration complete. So, you need to provide a decoration method to redecorate. There are several common cases:

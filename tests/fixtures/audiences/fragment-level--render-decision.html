@@ -1,0 +1,36 @@
+<html>
+<head>
+  <meta name="audience-manifest" content="/tests/fixtures/audiences/fragments--render-decision.json"/>
+  <script>
+    window.AUDIENCES = {
+      foo: () => true,
+      bar: () => false,
+    }
+    window.renderDecisionCalls = [];
+    window.PLUGIN_OPTIONS = {
+      renderDecision: (el, decision) => {
+        window.renderDecisionCalls.push({
+          tag: el.tagName,
+          type: decision.type,
+          scope: decision.scope,
+          url: decision.url,
+          selector: decision.selector || null,
+        });
+        el.innerHTML = '<div>RENDERED ' + decision.scope + '</div>';
+      },
+    };
+  </script>
+  <script type="module" src="/tests/fixtures/scripts.js"></script>
+</head>
+<body>
+  <main>
+    <div>
+      <div>
+        <div class="fragment">
+          <div>Hello World!</div>
+        </div>
+      </div>
+    </div>
+  </main>
+</body>
+</html>

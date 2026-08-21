@@ -1,0 +1,10 @@
+{
+  "version": "1",
+  "audiences": { "returning-visitor": true, "new-visitor": false },
+  "assignments": { "hero-test": "challenger-1" },
+  "decisions": {
+    ".hero": { "url": "/fragments/hero-a" },
+    ".promo": { "content": "<div>Promo</div>" },
+    ".sidebar": { "ref": "cms:12345" }
+  }
+}
