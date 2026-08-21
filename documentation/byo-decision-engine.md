@@ -30,6 +30,7 @@ A ready-to-adapt worker for that middle box lives in
 |---|---|
 | [`resolveAudiences(names, context)`](#resolveaudiences) | one batched, context-aware audience resolution |
 | [`getAssignment(experimentId, context)`](#getassignment) | delegate the experiment split to your engine |
+| [`resolveDecisions(entries, context)`](#resolvedecisions) | resolve content per manifest slot in one batched call |
 | [`rumTracking`](#rumtracking) | disable or delegate the built-in RUM exposure tracking |
 | [`renderDecision(el, decision)`](#renderdecision) | apply a decision however it is shaped |
 | [`listAudiences()`](#listaudiences) | advertise the audience universe to the simulation panel |
@@ -73,7 +74,10 @@ loadEager(document, {
 ```
 
 - Called once per scope with the full set of requested names.
-- The `?audience=…` forced audience (simulation) still wins.
+- The `?audience=…` forced audience (simulation) still wins the plugin's own
+  selection — but the hook is still invoked (for its resolution side-effect,
+  e.g. an engine that renders/stashes content per call) so it has run and has
+  something to apply once the forced audience is served.
 - A rejection falls back to **control** (no audience resolved) rather than
   blocking render.
 - It replaces the per-audience `audiences[key]()` path, and works even without a
@@ -122,7 +126,44 @@ loadEager(document, {
 - A falsy answer or an error falls back to the plugin's own client-side
   bucketing (as if the hook were absent).
 - An unknown variant serves **control** rather than re-randomizing.
-- The `?experiment=<id>/<variant>` QA override still wins.
+- The `?experiment=<id>/<variant>` QA override still wins the plugin's own arm
+  selection — but the hook is still invoked (for its resolution side-effect)
+  so an engine that stashes/renders content per call has run and has
+  something to apply once the forced arm is served.
+
+## resolveDecisions
+
+A first-class "engine returns content per slot" lane, independent of
+audiences/experiments/campaigns above. Publish a manifest sheet via a
+`decisions-manifest` page metadata — `{ page?, selector, ...yourColumns }`,
+same sheet shape as the other manifests but **no `url` column required** —
+and resolve every row on the page in one call:
+
+```js
+loadEager(document, {
+  resolveDecisions: async (entries, context) => {
+    // entries: the decisions-manifest rows for this page, e.g.
+    //   [{ selector: '.hero', placement: 'hero-slot' }, …]
+    // return { [selector]: { url } } for the slots you have content for
+    const resp = await fetch('/api/decide', {
+      method: 'POST',
+      body: JSON.stringify({ entries, context }),
+    });
+    const { decisions } = await resp.json();
+    return decisions;
+  },
+});
+```
+
+- Called **once** per page with every entry the manifest declares for it.
+- Each selector present in the returned map is applied (fragment scope) as
+  soon as that element appears in the DOM; a selector the hook doesn't answer
+  for is left at its default (authored) content.
+- No-op unless BOTH `resolveDecisions` is set AND the page publishes a
+  `decisions-manifest` metadata — unlike `resolveAudiences`/`getAssignment`,
+  there is no QA override to bypass this lane.
+- `renderDecision` still owns *how* the resolved `{ url }` is applied (see
+  below); the default is fetch-and-replace, fragment scope.
 
 ## rumTracking
 
@@ -157,7 +198,7 @@ return JSON, content references or external-CMS ids instead. Provide
 loadEager(document, {
   renderDecision: async (el, decision) => {
     // decision: { type, scope, url, selector?, config }
-    //   type:  'experiment' | 'campaign' | 'audience'
+    //   type:  'experiment' | 'campaign' | 'audience' | 'decision'
     //   scope: 'page' | 'section' | 'fragment'
     //   url:   the resolved experience URL / content reference
     el.innerHTML = await myRenderer(decision);

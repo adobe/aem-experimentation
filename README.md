@@ -244,6 +244,8 @@ const experimentationConfig = {
   resolveAudiences: async (names, context) => ({ /* [name]: boolean */ }),
   // Delegate the experiment split to an external engine (skip randomization):
   getAssignment: async (experimentId, context) => 'control',
+  // Resolve content per "decisions-manifest" slot in one batched call:
+  resolveDecisions: async (entries, context) => ({ /* [selector]: { url } */ }),
   // Disable ('off') or delegate (a function) the built-in RUM exposure tracking:
   rumTracking: 'off',
   // Apply a decision however it is shaped (JSON, content ref, DOM patch):
