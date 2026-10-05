@@ -1,0 +1,13 @@
+<html>
+<head>
+  <script type="module">
+    // Expose the contract validators on window so tests can exercise them
+    // (a dynamic import() inside page.evaluate gets mangled by Playwright's
+    // transform, so import at module scope here instead).
+    import * as contract from '/src/contract.js';
+    window.contract = contract;
+    window.contractReady = true;
+  </script>
+</head>
+<body></body>
+</html>

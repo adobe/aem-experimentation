@@ -124,7 +124,9 @@ test.describe('Page-level experiments', () => {
       window.hlx = { rum: { sampleRUM: (...args) => window.logRumCall(args) } };
     });
     await page.goto('/tests/fixtures/experiments/page-level--redirect');
-    await page.waitForFunction(() => window.hlx.rum.sampleRUM);
+    // Wait until the experiment's RUM exposure has actually been recorded (it
+    // fires right before the redirect), not merely until sampleRUM exists.
+    await expect.poll(() => rumCalls.length).toBeGreaterThan(0);
     expect(rumCalls[0]).toContainEqual([
       'experiment',
       {
@@ -143,12 +145,14 @@ test.describe('Page-level experiments', () => {
       v2: '/tests/fixtures/experiments/page-level-v2',
       redirect: '/tests/fixtures/experiments/page-level--redirect',
     };
-    const url = new URL(page.url());
-    const variant = Object.keys(expectedUrlPath).find((k) => url.pathname.endsWith(k));
-    expect(await page.evaluate(() => window.document.body.innerText)).toMatch(
-      new RegExp(expectedContent[variant]),
-    );
-    expect(expectedUrlPath[variant]).toBe(url.pathname);
+    // The RUM event already tells us which variant was served, and a challenger
+    // triggers window.location.replace(). Derive the expected landing state from
+    // it and wait for that (possible) redirect to settle, rather than reading
+    // the body mid-navigation — which raced and destroyed the execution context.
+    const { target } = rumCalls[0][0][1];
+    const variant = { control: 'redirect', 'challenger-1': 'v1', 'challenger-2': 'v2' }[target];
+    await expect(page).toHaveURL(new RegExp(`${expectedUrlPath[variant]}$`));
+    await expect(page.locator('body')).toContainText(expectedContent[variant]);
   });
 
   test('Exposes the experiment in a JS API.', async ({ page }) => {
