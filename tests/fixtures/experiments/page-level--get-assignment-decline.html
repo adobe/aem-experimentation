@@ -1,0 +1,18 @@
+<html>
+<head>
+  <meta name="experiment" content="foo"/>
+  <meta name="experiment-variants" content="/tests/fixtures/experiments/page-level-v1,/tests/fixtures/experiments/page-level-v2"/>
+  <meta name="experiment-name" content="V1,V2"/>
+  <script>
+    // A falsy answer means the engine does not own this experiment, so the
+    // plugin should fall back to its own client-side bucketing.
+    window.PLUGIN_OPTIONS = {
+      getAssignment: () => undefined,
+    };
+  </script>
+  <script type="module" src="/tests/fixtures/scripts.js"></script>
+</head>
+<body>
+  <main>Hello World!</main>
+</body>
+</html>

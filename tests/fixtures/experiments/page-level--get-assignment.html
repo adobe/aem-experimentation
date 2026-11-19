@@ -1,0 +1,21 @@
+<html>
+<head>
+  <meta name="experiment" content="foo"/>
+  <meta name="experiment-variants" content="/tests/fixtures/experiments/page-level-v1,/tests/fixtures/experiments/page-level-v2"/>
+  <meta name="experiment-name" content="V1,V2"/>
+  <script>
+    // The engine owns the assignment; the plugin must not re-bucket.
+    window.getAssignmentCalls = [];
+    window.PLUGIN_OPTIONS = {
+      getAssignment: (experimentId, context) => {
+        window.getAssignmentCalls.push({ experimentId, context });
+        return 'challenger-1';
+      },
+    };
+  </script>
+  <script type="module" src="/tests/fixtures/scripts.js"></script>
+</head>
+<body>
+  <main>Hello World!</main>
+</body>
+</html>
