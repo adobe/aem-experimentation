@@ -241,6 +241,29 @@ test.describe('Page-level experiments', () => {
     await goToAndRunExperiment(page, '/tests/fixtures/experiments/page-level--inactive');
     expect(await page.locator('main').textContent()).toEqual('Hello World!');
   });
+
+  test('Keeps the random allocation when selectVariant throws or rejects.', async ({ page }) => {
+    const warnings = [];
+    page.on('console', (msg) => {
+      if (msg.type() === 'warning' && msg.text().includes('selectVariant failed')) warnings.push(msg.text());
+    });
+    await page.addInitScript(() => {
+      window.SELECT_VARIANT = () => { throw new Error('decision engine down'); };
+    });
+    await goToAndRunExperiment(page, '/tests/fixtures/experiments/page-level');
+    expect(await page.locator('main').textContent()).toMatch(/Hello (World|v1|v2)!/);
+    expect(await page.evaluate(() => window.hlx.experiments[0].config.selectedVariant))
+      .toMatch(/^(control|challenger-1|challenger-2)$/);
+
+    await page.addInitScript(() => {
+      window.SELECT_VARIANT = async () => Promise.reject(new Error('decision engine down'));
+    });
+    await goToAndRunExperiment(page, '/tests/fixtures/experiments/page-level');
+    expect(await page.locator('main').textContent()).toMatch(/Hello (World|v1|v2)!/);
+    expect(await page.evaluate(() => window.hlx.experiments[0].config.selectedVariant))
+      .toMatch(/^(control|challenger-1|challenger-2)$/);
+    expect(warnings).toHaveLength(2);
+  });
 });
 
 test.describe('Section-level experiments', () => {

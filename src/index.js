@@ -827,10 +827,17 @@ async function getExperimentConfig(pluginOptions, metadata, overrides) {
     config.selectedVariant = toClassName(overrides.variant);
   } else {
     // A project can pin the visitor to a variant (e.g. by browser or a known segment).
-    // Anything that isn't one of this experiment's variants keeps the random allocation.
-    const pinnedVariant = typeof pluginOptions.selectVariant === 'function'
-      ? toClassName(await pluginOptions.selectVariant(config) || '')
-      : '';
+    // Anything that isn't one of this experiment's variants, or a failing callback,
+    // keeps the random allocation.
+    let pinnedVariant = '';
+    if (typeof pluginOptions.selectVariant === 'function') {
+      try {
+        pinnedVariant = toClassName(await pluginOptions.selectVariant(config) || '');
+      } catch (err) {
+        // eslint-disable-next-line no-console
+        console.warn('selectVariant failed, keeping the random allocation:', err);
+      }
+    }
     if (variantNames.includes(pinnedVariant)) {
       config.selectedVariant = pinnedVariant;
     } else {

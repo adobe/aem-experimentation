@@ -124,10 +124,13 @@ await loadEager(document, {
 });
 ```
 
-- The returned name is matched like the `experiment-variant` query parameter (e.g. `Challenger 1` and `challenger-1` are equivalent).
-- If it returns nothing or a name that isn't one of the experiment's variants, the random allocation is used.
+- Return one of the variant ids in `config.variantNames` (`control`, `challenger-1`, …), not a custom variant label. The name is normalized like the `?experiment=<id>/<variant>` query parameter, so `Challenger 1` also matches `challenger-1`.
+- If it returns nothing, a name that isn't one of the experiment's variants, or throws/rejects, the random allocation is used (failures are logged with `console.warn`).
 - It only runs for experiments that would run anyway (active, within dates, audiences resolved, consent given), and query parameter overrides still take precedence.
+- It can be called more than once per page view: once per experiment, and for manifest-based fragment experiments on DOM mutations until the entries apply. Keep it cheap and deterministic, or cache its decision.
 - The served variant is tracked in RUM like any other. Keep in mind that pinning a segment to a variant ties the result to that segment, so the comparison is no longer a randomized A/B test.
+
+:warning: An async `selectVariant` (for instance one that calls an external decision service) blocks the page rendering until it resolves, just like async audiences, which will have a performance impact on the initial page load.
 
 #### Time bound experiments
 
