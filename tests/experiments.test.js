@@ -222,6 +222,20 @@ test.describe('Page-level experiments', () => {
     expect(await page.locator('main').textContent()).toMatch(/Hello (World|v1|v2)!/);
     expect(await page.evaluate(() => window.hlx.experiments[0].config.selectedVariant))
       .toMatch(/^(control|challenger-1|challenger-2)$/);
+
+    await page.addInitScript(() => {
+      window.SELECT_VARIANT = () => undefined;
+    });
+    await goToAndRunExperiment(page, '/tests/fixtures/experiments/page-level');
+    expect(await page.evaluate(() => window.hlx.experiments[0].config.selectedVariant))
+      .toMatch(/^(control|challenger-1|challenger-2)$/);
+
+    await page.addInitScript(() => {
+      window.SELECT_VARIANT = async () => null;
+    });
+    await goToAndRunExperiment(page, '/tests/fixtures/experiments/page-level');
+    expect(await page.evaluate(() => window.hlx.experiments[0].config.selectedVariant))
+      .toMatch(/^(control|challenger-1|challenger-2)$/);
   });
 
   test('Query parameter overrides take precedence over selectVariant.', async ({ page }) => {
