@@ -49,6 +49,11 @@ export const DEFAULT_OPTIONS = {
   // Redecoration function for fragments
   decorateFunction: () => {},
 
+  // Optional `(config) => variantName` (sync or async) to pin the visitor to an experiment
+  // variant. Query parameter overrides take precedence; unknown or empty results keep the
+  // random allocation.
+  selectVariant: null,
+
   // Which simulation UI to wire up in preview/dev environments:
   // - 'auto' (default): wire up the AEM Sidekick panel if/when the Sidekick is present
   // - 'sidekick': same as 'auto', but explicit
@@ -821,10 +826,26 @@ async function getExperimentConfig(pluginOptions, metadata, overrides) {
   } else if (overrides.variant && variantNames.includes(overrides.variant)) {
     config.selectedVariant = toClassName(overrides.variant);
   } else {
-    // eslint-disable-next-line import/extensions
-    const { ued } = await import('./ued.js');
-    const decision = ued.evaluateDecisionPolicy(toDecisionPolicy(config), {});
-    config.selectedVariant = decision.items[0].id;
+    // A project can pin the visitor to a variant (e.g. by browser or a known segment).
+    // Anything that isn't one of this experiment's variants, or a failing callback,
+    // keeps the random allocation.
+    let pinnedVariant = '';
+    if (typeof pluginOptions.selectVariant === 'function') {
+      try {
+        pinnedVariant = toClassName(await pluginOptions.selectVariant(config) || '');
+      } catch (err) {
+        // eslint-disable-next-line no-console
+        console.warn('selectVariant failed, keeping the random allocation:', err);
+      }
+    }
+    if (variantNames.includes(pinnedVariant)) {
+      config.selectedVariant = pinnedVariant;
+    } else {
+      // eslint-disable-next-line import/extensions
+      const { ued } = await import('./ued.js');
+      const decision = ued.evaluateDecisionPolicy(toDecisionPolicy(config), {});
+      config.selectedVariant = decision.items[0].id;
+    }
   }
 
   return config;

@@ -111,6 +111,27 @@ If you wanted to additionally restrict the experiments to specific audiences, so
 If any of the listed audiences is resolved, then the experiment will run and the matching content will be served. The list is essentially treated as an "or".
 If you needed both audiences to be resolved (i.e. treated as "and"), for say a "US" audience and the "iPad" audience, you'd define a new custom "us-ipad" audience in your project that checks for both conditions and use that in the metadata instead.
 
+#### Pinning visitors to a variant
+
+By default, visitors are allocated to variants at random, following the `Experiment Split`. If your project needs to serve a specific variant to a known group of visitors (for instance a browser, a logged-in segment, or a decision from an external engine), pass a `selectVariant` function in the plugin options. It receives the experiment config (including `id` and `variantNames`) and returns a variant name, either directly or as a promise:
+
+```js
+await loadEager(document, {
+  selectVariant: (config) => {
+    if (config.id !== 'hero-test') return undefined;
+    return /Chrome\//.test(navigator.userAgent) ? 'challenger-1' : 'control';
+  },
+});
+```
+
+- Return one of the variant ids in `config.variantNames` (`control`, `challenger-1`, …), not a custom variant label. The name is normalized like the `?experiment=<id>/<variant>` query parameter, so `Challenger 1` also matches `challenger-1`.
+- If it returns nothing, a name that isn't one of the experiment's variants, or throws/rejects, the random allocation is used (failures are logged with `console.warn`).
+- It only runs for experiments that would run anyway (active, within dates, audiences resolved, consent given), and query parameter overrides still take precedence.
+- It can be called more than once per page view: once per experiment, and for manifest-based fragment experiments on DOM mutations until the entries apply. Keep it cheap and deterministic, or cache its decision.
+- The served variant is tracked in RUM like any other. Keep in mind that pinning a segment to a variant ties the result to that segment, so the comparison is no longer a randomized A/B test.
+
+:warning: An async `selectVariant` (for instance one that calls an external decision service) blocks the page rendering until it resolves, just like async audiences, which will have a performance impact on the initial page load.
+
 #### Time bound experiments
 
 You can also specify start and end dates, as well as toggle the experiment status.

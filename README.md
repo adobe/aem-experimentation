@@ -221,6 +221,9 @@ const experimentationConfig = {
   // See more details on the dedicated Experiments page linked below
   experimentsMetaTagPrefix: 'experiment',
   experimentsQueryParameter: 'experiment',
+  // Optional `(config) => variantName` (sync or async) to pin the visitor to a variant
+  // instead of the random allocation. See "Pinning visitors to a variant" on the Experiments page.
+  selectVariant: null,
 
   /* Fragment experiment needs redecoration */
   // See more details below

@@ -66,7 +66,10 @@ async function loadEager(doc) {
     || [...document.querySelectorAll('.section-metadata div')].some((d) => d.textContent.match(/Experiment|Campaign|Audience/i))) {
     // eslint-disable-next-line import/no-absolute-path, import/no-unresolved
     const { loadEager: runEager } = await import('/src/index.js');
-    await runEager(document, { audiences: window.AUDIENCES || {} });
+    await runEager(document, {
+      audiences: window.AUDIENCES || {},
+      selectVariant: window.SELECT_VARIANT,
+    });
   }
 
   const main = doc.querySelector('main');
